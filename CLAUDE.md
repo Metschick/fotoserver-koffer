@@ -111,18 +111,28 @@ Diese Dateien und Ordner sollen über `.gitignore` ausgeschlossen werden.
 
 ## Entwicklungsstrategie
 
-Aktuelle Entwicklungsreihenfolge:
+Detaillierter Implementierungsplan: `plans/architektur-fotoserver-koffer.md` (Abschnitt 12)
 
-1. Grundstruktur des Projekts erstellen
-2. GitHub-Repository aufbauen
-3. Dokumentation erstellen
-4. Backend entwickeln
-5. Frontend entwickeln
-6. Uploadsystem integrieren
-7. Galerie integrieren
-8. Deployment auf Raspberry Pi 5
-9. Hotspot-, Nginx- und Systemintegration
-10. Praxistests im Hacking-Koffer
+Übergeordnete Phasen:
+
+1. Grundstruktur und Projektgerüst
+2. Backend-Grundgerüst
+3. Upload-System
+4. Thumbnail-Generierung
+5. Galerie-API
+6. Frontend-Grundgerüst
+7. Upload-View
+8. Galerie-View
+9. Nginx-Konfiguration
+10. systemd-Service
+11. Start/Stop-Skripte
+12. Desktop-Shortcuts (V1.5)
+13. Install-Skript
+14. Hotspot-Setup
+15. Logging + Exception-Handler
+16. Backup-Skript
+17. GTK-Tray-App (V2a, optional)
+18. Dokumentation + Tests
 
 ---
 
@@ -151,6 +161,54 @@ Ziel ist ein sauber aufgebautes, langfristig wartbares Projekt mit vollständige
 
 ---
 
+## Aktueller Projektstand (2026-06-22)
+
+### Abgeschlossene Schritte
+
+#### Schritt 1 – Projektstruktur (Commit: 5603ff3)
+
+Erstellt am 2026-06-22. Enthält:
+
+* Vollständiges Verzeichnis-Skelett: `backend/`, `frontend/`, `deploy/`, `docs/`, `plans/`
+* `.gitignore`: schließt `.env`, `uploads/`, `data/`, `*.db`, `venv/`, `node_modules/`, Keys und Zertifikate aus
+* `.env.example`: vollständige Konfigurationsvorlage mit Hinweisen zu bcrypt-Hashes und Key-Generierung
+* `README.md`: Projektbeschreibung, Schnellstart-Anleitung, Start/Stop-Befehle
+* `LICENSE`: MIT
+* `backend/requirements.txt`: Produktionsabhängigkeiten (FastAPI, SQLModel, Pillow, python-magic, bcrypt, uvicorn)
+* `backend/requirements-dev.txt`: Entwicklungsabhängigkeiten (pytest, httpx2, ruff)
+* `backend/pyproject.toml`: Projektmetadaten, ruff-Konfiguration, pytest-Einstellungen
+* Python-Package-Skeletons: leere `__init__.py`-Dateien in allen App-Modulen
+* `.gitkeep`-Dateien in allen noch leeren Verzeichnissen
+
+#### Schritt 2 – Backend-Grundgerüst (Commit: dcd8a1d)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `backend/app/__init__.py`: `APP_VERSION = "0.1.0"` als zentrale Versionsquelle
+* `backend/app/config.py`: pydantic-settings `Settings`-Klasse; `secret_key`-Validator (≥32 Zeichen, kein Default erlaubt); Properties für MIME-Typen, DB-Pfad und maximale Dateigröße
+* `backend/app/database.py`: SQLite-Engine mit `journal_mode=WAL`, `busy_timeout=5000`, `foreign_keys=ON`; typisiertes `get_session()`-Generator
+* `backend/app/models/media.py`: SQLModel `Media`-Tabelle mit `device_name`-Whitelist-Regex-Validator (`^[a-zA-Z0-9_-]{1,50}$`), timezone-awareem `uploaded_at` (`datetime.now(timezone.utc)`), `album_path`-Property
+* `backend/app/routers/health.py`: `GET /api/health` mit DB-Konnektivitätsprüfung, `logger.exception` bei Fehler, Version aus `APP_VERSION`
+* `backend/app/main.py`: FastAPI-Lifespan (Verzeichnisse + DB-Init), Router eingebunden
+* `backend/conftest.py`: Root-Conftest setzt `SECRET_KEY` vor App-Import (verhindert Validator-Fehler in Tests)
+* `backend/tests/conftest.py`: In-Memory-SQLite mit FK-Pragmas, `dependency_overrides` für saubere Session-Isolation
+* `backend/tests/test_health.py`: 2 Tests (HTTP-Status + Body-Validierung)
+
+**Teststatus:** 2/2 grün, ruff clean, keine Warnungen.
+
+### Nächster Schritt
+
+**Schritt 3 – Upload-System** (noch nicht begonnen)
+
+Geplanter Inhalt:
+* `POST /api/upload`: Datei-Upload (multipart/form-data)
+* `backend/app/services/storage.py`: Dateispeicherung mit UUID4-Dateinamen, Ordnerstruktur `Gerätename/YYYY-MM-DD/`
+* `backend/app/utils/file_utils.py`: MIME-Prüfung via python-magic (Magic Bytes), Dateinamen-Sanitierung, Disk-Space-Check
+* Authentifizierung: Nutzer-Passwort-Middleware (bcrypt-Vergleich, HTTP-Only Cookie)
+* Tests: Upload-Erfolg, zu große Datei, ungültiger MIME-Typ, volle Festplatte
+
+---
+
 ## Architekturentscheidungen (2026-06-22)
 
 Vollständiger Plan: `plans/architektur-fotoserver-koffer.md`
@@ -175,11 +233,12 @@ Vollständiger Plan: `plans/architektur-fotoserver-koffer.md`
 * Dateinamen im Dateisystem: ausschließlich UUID4 + sanitierte Erweiterung
 * Original-Dateiname: nur als DB-Metadatum gespeichert, nie als Pfad
 * MIME-Typ: server-seitig per Magic Bytes geprüft (python-magic), nie per HTTP-Header
-* Album-Namen: Whitelist-Regex `^[a-zA-Z0-9_-]{1,50}$` vor Dateisystem-Verwendung
+* Album-Namen / Gerätename: Whitelist-Regex `^[a-zA-Z0-9_-]{1,50}$` vor Dateisystem-Verwendung (im Model als `field_validator` erzwungen)
 * Nginx `/uploads/`: `X-Content-Type-Options: nosniff` + `Content-Disposition: attachment`
 * Upload-Limit: 100 MB pro Datei + Disk-Free-Space-Check vor Schreiben
+* `secret_key`: Pflichtfeld, min. 32 Zeichen, kein Default — Validator in `config.py`
 * hostapd.conf auf Pi: `chmod 600 chown root:root`
-* SQLite: `journal_mode=WAL` + `busy_timeout=5000`
+* SQLite: `journal_mode=WAL` + `busy_timeout=5000` + `foreign_keys=ON`
 
 ### Start/Stop-Konzept (bestätigt)
 
@@ -223,3 +282,30 @@ Versionspfad:
 * **Authentifizierung:** Einfaches gemeinsames Passwort (Upload + Galerie); separates Admin-Passwort für Lösch-Funktion; Session via HTTP-Only Cookie; Passwörter als bcrypt-Hash in `.env`
 * **Album-Struktur:** Automatisch `Gerätename/YYYY-MM-DD/`; Gerätename per Freitextfeld im Upload-Formular (Whitelist-validiert); manuelle Alben erst ab Version 2
 * **Lösch-Funktion:** Nur über Admin-Interface mit Admin-Passwort
+
+---
+
+## Offene Entscheidungen
+
+Diese Punkte wurden im Architekturplan bewusst zurückgestellt und müssen vor dem jeweiligen Implementierungsschritt geklärt werden.
+
+### Vor Schritt 3 (Upload-System)
+
+* **Auth-Scope:** Gilt das Nutzer-Passwort nur für den Upload-Endpunkt, oder auch für die Galerie-Ansicht? (Einfluss auf Middleware-Platzierung)
+* **Session-Dauer:** Wie lange soll eine Login-Session gültig sein? (z.B. 24 Stunden, oder bis zum manuellen Logout)
+* **Upload-Verhalten bei Duplikaten:** Was passiert, wenn dieselbe Datei zweimal hochgeladen wird? Überschreiben, ignorieren, oder doppelt speichern?
+
+### Vor Schritt 6 (Frontend)
+
+* **Sprache der Benutzeroberfläche:** Deutsch oder Englisch?
+* **Dark/Light Mode:** Soll das Frontend einen Dark Mode unterstützen?
+
+### Vor Schritt 11 (Start/Stop-Skripte)
+
+* **Sudo-Strategie:** Soll der Operator-User sudo-Rechte für `systemctl start/stop fotoserver.target` ohne Passwort haben, oder soll PolicyKit für die Desktop-Shortcuts genutzt werden?
+
+### Langfristig offen (Version 2)
+
+* **Backup-Ziel:** Lokales Backup auf externer USB-SSD, oder Backup über Netzwerk auf einen anderen Rechner?
+* **Mehrsprachigkeit:** Deutsch/Englisch-Umschaltung im Interface?
+* **Maximale Upload-Größe für Videos:** 100 MB aktuell — realistisch für längere Videos? Eventuell auf 500 MB erhöhen?

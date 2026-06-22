@@ -275,7 +275,7 @@ Erstellt am 2026-06-22. Enthält:
 
 **ECC-Review-Ergebnis:** 2 HIGH + 5 MEDIUM gefunden und behoben — Object-URL-Leak auf Unmount, XHR nicht abgebrochen auf Unmount, doppelter Keyboard-Tab-Stop, fehlender `aria-label`, doppelter `:key` in `v-for`, Race Condition bei Live-Array-Iteration.
 
-#### Schritt 8 – Galerie-View (Commit: ausstehend)
+#### Schritt 8 – Galerie-View (Commit: f531e7d)
 
 Erstellt am 2026-06-23. Enthält:
 

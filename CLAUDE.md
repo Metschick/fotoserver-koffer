@@ -211,7 +211,7 @@ Erstellt am 2026-06-22. Enthält:
 
 **Auth-Entscheidung:** Kein Web-Login für normale Nutzer. WLAN-Passwort des Hotspots ist primäre Authentifizierung. Upload und Galerie für alle Geräte im Hotspot-Netz offen.
 
-#### Schritt 4 – Thumbnail-Generierung (Commit: ausstehend)
+#### Schritt 4 – Thumbnail-Generierung (Commit: 4c90fcb)
 
 Erstellt am 2026-06-22. Enthält:
 
@@ -228,16 +228,23 @@ Erstellt am 2026-06-22. Enthält:
 
 **Thumbnail-Entscheidung:** Synchrone Generierung (kein BackgroundTask in V1 — vereinfacht Fehlerbehandlung und ist auf Pi für lokale Uploads akzeptabel). `thumb_path` kann `null` sein wenn Generierung fehlschlägt (Upload trotzdem 201).
 
+#### Schritt 5 – Galerie-API (Commit: ausstehend)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `backend/app/routers/gallery.py`: 5 Endpunkte — `GET /api/gallery` (paginiert, neueste zuerst); `GET /api/gallery/{device_name}/{date_str}` (Album nach Gerät+Datum, älteste zuerst + Sekundärsortierung nach id); `GET /api/media/{id}` (Metadaten); `GET /api/media/{id}/thumb` (Thumbnail als FileResponse); `GET /api/media/{id}/file` (Original als FileResponse mit `Content-Disposition: attachment`)
+* `backend/app/models/media.py`: `GalleryPage`-Schema aus Router extrahiert; Kompositindex `(device_name, uploaded_at)` für Album-Abfragen
+* Path-Traversal-Schutz: Alle DB-abgeleiteten Pfade werden per `.resolve()` + `is_relative_to()` gegen upload_dir geprüft
+* `_assert_within_upload_dir()`: zentrale Sicherheitsfunktion für Dateipfad-Validierung
+* `backend/tests/test_gallery.py`: 20 Tests (leer, Pagination, Sortierung, Album-Filter, Validierung, 404-Fälle, Datei fehlt auf Disk für thumb+original)
+
+**Teststatus:** 47/47 grün, ruff clean.
+
+**API-Designentscheidung:** Album-Pfad mit zwei getrennten URL-Segmenten `{device_name}/{date_str}` statt `{album:path}` — sauberer, kein Path-Parameter mit Slash.
+
 ### Nächster Schritt
 
-**Schritt 5 – Galerie-API** (noch nicht begonnen)
-
-Geplanter Inhalt:
-* `GET /api/gallery`: Liste aller Alben (`Gerätename/YYYY-MM-DD`)
-* `GET /api/gallery/{album}`: Medien in einem Album
-* `GET /api/media/{id}`: Einzelnes Medium (Metadaten)
-* `GET /api/media/{id}/thumb`: Thumbnail-Datei ausliefern
-* `GET /api/media/{id}/file`: Originaldatei ausliefern
+**Schritt 6 – Frontend-Grundgerüst** (Vue 3 + Vite + Tailwind CSS)
 
 ---
 

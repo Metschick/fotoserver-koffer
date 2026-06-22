@@ -2,12 +2,18 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from app.utils.file_utils import validate_device_name
 
 
 class Media(SQLModel, table=True):
+    __table_args__ = (
+        # Kompositindex für Album-Abfragen: WHERE device_name=? ORDER BY uploaded_at
+        Index("ix_media_device_uploaded", "device_name", "uploaded_at"),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Originalname – nur Metadatum, niemals als Dateipfad verwenden
@@ -65,3 +71,12 @@ class MediaRead(BaseModel):
             album_path=m.album_path,
             thumb_path=m.thumb_path,
         )
+
+
+class GalleryPage(BaseModel):
+    """Paginiertes Ergebnis einer Galerie-Abfrage."""
+
+    items: list[MediaRead]
+    total: int
+    limit: int
+    offset: int

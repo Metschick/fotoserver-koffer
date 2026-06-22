@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app import APP_VERSION
 from app.config import get_settings
 from app.database import init_db
-from app.routers import health, upload
+from app.routers import gallery, health, upload
 
 
 @asynccontextmanager
@@ -25,3 +25,4 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
+app.include_router(gallery.router, prefix="/api")

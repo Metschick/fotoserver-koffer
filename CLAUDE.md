@@ -291,7 +291,7 @@ Erstellt am 2026-06-23. Enthält:
 
 **Designentscheidung Video-Inline:** Videos können in V1 nicht inline abgespielt werden, da der `/api/media/{id}/file`-Endpunkt `Content-Disposition: attachment` setzt und Browser bei `<video src="...">` dann den Download triggern statt zu streamen. Lösung für V2: separater `/api/media/{id}/view`-Endpunkt ohne Content-Disposition.
 
-#### Schritt 9 – Nginx-Konfiguration (Commit: ausstehend)
+#### Schritt 9 – Nginx-Konfiguration (Commit: 709296d)
 
 Erstellt am 2026-06-23. Enthält:
 

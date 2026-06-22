@@ -228,7 +228,7 @@ Erstellt am 2026-06-22. Enthält:
 
 **Thumbnail-Entscheidung:** Synchrone Generierung (kein BackgroundTask in V1 — vereinfacht Fehlerbehandlung und ist auf Pi für lokale Uploads akzeptabel). `thumb_path` kann `null` sein wenn Generierung fehlschlägt (Upload trotzdem 201).
 
-#### Schritt 5 – Galerie-API (Commit: ausstehend)
+#### Schritt 5 – Galerie-API (Commit: 991121a)
 
 Erstellt am 2026-06-22. Enthält:
 
@@ -242,9 +242,28 @@ Erstellt am 2026-06-22. Enthält:
 
 **API-Designentscheidung:** Album-Pfad mit zwei getrennten URL-Segmenten `{device_name}/{date_str}` statt `{album:path}` — sauberer, kein Path-Parameter mit Slash.
 
+#### Schritt 6 – Frontend-Grundgerüst (Commit: ausstehend)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `frontend/package.json`: Vue 3 + Vue Router + Vite + Tailwind CSS + TypeScript (Node.js 20)
+* `frontend/vite.config.ts`: `@/`-Alias auf `src/`; Dev-Proxy `/api` → `http://localhost:8000`
+* `frontend/tailwind.config.js`: `darkMode: 'class'`, Content-Glob auf `.vue`+`.ts`
+* `frontend/index.html`: Inline-Skript für sofortige FOUC-freie Theme-Initialisierung
+* `frontend/src/composables/useTheme.ts`: Singleton-Ref für `'light'|'dark'`; liest System-Präferenz (`prefers-color-scheme`) beim ersten Besuch; persistiert in `localStorage('fotoserver-theme')`; togglet `dark`-Klasse auf `<html>`
+* `frontend/src/components/NavBar.vue`: Logo + Navigationslinks (aktiver Link hervorgehoben) + Theme-Toggle-Button (Sonne/Mond-SVG)
+* `frontend/src/router/index.ts`: `createWebHistory`; drei Routen (`/`, `/upload`, `/galerie`); Upload+Galerie als lazy-loaded Chunks
+* `frontend/src/api/client.ts`: `fetchJson<T>()` + `ApiError`-Klasse (Basis für Steps 7+8)
+* `frontend/src/views/`: `HomeView.vue` (Willkommensseite mit Links); `UploadView.vue` (Platzhalter für Schritt 7); `GalleryView.vue` (Platzhalter für Schritt 8)
+
+**Dev-Start:** `cd frontend && npm install && npm run dev`
+**Build:** `npm run build` → `dist/`
+
+**UI-Entscheidungen:** Deutsch, Dark/Light Mode mit System-Präferenz + Toggle + LocalStorage (bestätigt vor diesem Schritt).
+
 ### Nächster Schritt
 
-**Schritt 6 – Frontend-Grundgerüst** (Vue 3 + Vite + Tailwind CSS)
+**Schritt 7 – Upload-View** (Drag & Drop, Formular mit Gerätename, Fortschrittsanzeige)
 
 ---
 
@@ -321,6 +340,8 @@ Versionspfad:
 * **Authentifizierung:** Einfaches gemeinsames Passwort (Upload + Galerie); separates Admin-Passwort für Lösch-Funktion; Session via HTTP-Only Cookie; Passwörter als bcrypt-Hash in `.env`
 * **Album-Struktur:** Automatisch `Gerätename/YYYY-MM-DD/`; Gerätename per Freitextfeld im Upload-Formular (Whitelist-validiert); manuelle Alben erst ab Version 2
 * **Lösch-Funktion:** Nur über Admin-Interface mit Admin-Passwort
+* **UI-Sprache:** Deutsch (bestätigt vor Schritt 6)
+* **Dark Mode:** Beide Modi (hell + dunkel); Standard: System-Präferenz (`prefers-color-scheme`); manueller Toggle in NavBar; Persistenz via `localStorage`; FOUC-Schutz via Inline-Skript in `index.html` (bestätigt vor Schritt 6)
 
 ---
 
@@ -334,10 +355,10 @@ Diese Punkte wurden im Architekturplan bewusst zurückgestellt und müssen vor d
 * **Session-Dauer:** Entfällt für normale Nutzer (kein Web-Login). Admin-Sessions werden separat konzipiert, wenn das Admin-Interface implementiert wird.
 * **Upload-Verhalten bei Duplikaten:** Immer speichern — jeder Upload erhält eine neue UUID, keine Duplikaterkennung in Version 1.
 
-### Vor Schritt 6 (Frontend)
+### Vor Schritt 6 (Frontend) — ✅ geklärt
 
-* **Sprache der Benutzeroberfläche:** Deutsch oder Englisch?
-* **Dark/Light Mode:** Soll das Frontend einen Dark Mode unterstützen?
+* **Sprache der Benutzeroberfläche:** Deutsch
+* **Dark/Light Mode:** Beide Modi mit System-Präferenz als Standard + manueller Toggle + LocalStorage-Persistenz
 
 ### Vor Schritt 11 (Start/Stop-Skripte)
 

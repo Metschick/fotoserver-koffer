@@ -289,11 +289,11 @@ Versionspfad:
 
 Diese Punkte wurden im Architekturplan bewusst zurückgestellt und müssen vor dem jeweiligen Implementierungsschritt geklärt werden.
 
-### Vor Schritt 3 (Upload-System)
+### Vor Schritt 3 (Upload-System) — ✅ geklärt
 
-* **Auth-Scope:** Gilt das Nutzer-Passwort nur für den Upload-Endpunkt, oder auch für die Galerie-Ansicht? (Einfluss auf Middleware-Platzierung)
-* **Session-Dauer:** Wie lange soll eine Login-Session gültig sein? (z.B. 24 Stunden, oder bis zum manuellen Logout)
-* **Upload-Verhalten bei Duplikaten:** Was passiert, wenn dieselbe Datei zweimal hochgeladen wird? Überschreiben, ignorieren, oder doppelt speichern?
+* **Auth-Scope:** Kein Web-Login für normale Nutzer. Das WLAN-Passwort des Hotspots ist die primäre Authentifizierung. Upload und Galerie sind für alle Geräte im Hotspot-Netz offen. Admin-Login (für Löschen, Serververwaltung) wird erst später in einem separaten System umgesetzt.
+* **Session-Dauer:** Entfällt für normale Nutzer (kein Web-Login). Admin-Sessions werden separat konzipiert, wenn das Admin-Interface implementiert wird.
+* **Upload-Verhalten bei Duplikaten:** Immer speichern — jeder Upload erhält eine neue UUID, keine Duplikaterkennung in Version 1.
 
 ### Vor Schritt 6 (Frontend)
 

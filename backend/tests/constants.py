@@ -1,0 +1,1 @@
+TEST_SECRET_KEY = "test_secret_key_for_pytest_minimum_32_characters"

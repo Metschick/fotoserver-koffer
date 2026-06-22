@@ -1,11 +1,10 @@
-import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import BaseModel, field_validator
 from sqlmodel import Field, SQLModel
 
-_DEVICE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,50}$")
+from app.utils.file_utils import validate_device_name
 
 
 class Media(SQLModel, table=True):
@@ -20,7 +19,7 @@ class Media(SQLModel, table=True):
     mime_type: str
     size_bytes: int
 
-    # Gerätename aus Upload-Formular, Whitelist-validiert vor Speicherung
+    # Gerätename aus Upload-Formular, Whitelist-validiert
     device_name: str = Field(index=True)
 
     uploaded_at: datetime = Field(
@@ -34,14 +33,33 @@ class Media(SQLModel, table=True):
     @field_validator("device_name")
     @classmethod
     def device_name_must_be_safe(cls, v: str) -> str:
-        if not _DEVICE_NAME_RE.match(v):
-            raise ValueError(
-                "device_name must match ^[a-zA-Z0-9_-]{1,50}$ "
-                "(only letters, digits, hyphens, underscores, max 50 chars)"
-            )
-        return v
+        return validate_device_name(v)
 
     @property
     def album_path(self) -> str:
         """Pfad relativ zu upload_dir: Gerätename/YYYY-MM-DD"""
         return f"{self.device_name}/{self.uploaded_at.strftime('%Y-%m-%d')}"
+
+
+class MediaRead(BaseModel):
+    """API-Antwortschema für ein einzelnes Medium."""
+
+    id: int
+    filename: str
+    mime_type: str
+    size_bytes: int
+    device_name: str
+    uploaded_at: datetime
+    album_path: str
+
+    @classmethod
+    def from_media(cls, m: Media) -> "MediaRead":
+        return cls(
+            id=m.id,
+            filename=m.filename,
+            mime_type=m.mime_type,
+            size_bytes=m.size_bytes,
+            device_name=m.device_name,
+            uploaded_at=m.uploaded_at,
+            album_path=m.album_path,
+        )

@@ -261,9 +261,21 @@ Erstellt am 2026-06-22. Enthält:
 
 **UI-Entscheidungen:** Deutsch, Dark/Light Mode mit System-Präferenz + Toggle + LocalStorage (bestätigt vor diesem Schritt).
 
+#### Schritt 7 – Upload-View (Commit: ausstehend)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `frontend/src/api/media.ts`: `MediaRead`- und `GalleryPage`-Interfaces; `uploadFile()` via `XMLHttpRequest` (Fortschritts-Events); Rückgabe als `UploadHandle { promise, abort }` — ermöglicht saubere Abbruch-Behandlung beim Unmount
+* `frontend/src/components/UploadForm.vue`: Composition API; Drag & Drop Zone mit `dragover`/`dragleave`/`drop`-Handlers; Gerätename-Feld mit Whitelist-Regex-Validierung (`^[a-zA-Z0-9_-]{1,50}$`) und `localStorage`-Persistenz; Datei-Vorschau via Object URLs (Bilder); per-Datei Fortschrittsbalken; Statusicons (Spinner/Häkchen/Fehler); abgelehnte Dateien (falscher MIME oder >100 MB) als Amber-Warnung; `onUnmounted`-Cleanup: laufenden XHR abbrechen + alle Object URLs revoken; Batch-Snapshot vor Upload-Loop verhindert Race Condition bei gleichzeitigem Hinzufügen
+* `frontend/src/views/UploadView.vue`: Thin Wrapper um `<UploadForm />`
+
+**Build:** `vue-tsc && vite build` fehlerfrei (10.44 kB / gzip 4.22 kB für UploadView-Chunk).
+
+**ECC-Review-Ergebnis:** 2 HIGH + 5 MEDIUM gefunden und behoben — Object-URL-Leak auf Unmount, XHR nicht abgebrochen auf Unmount, doppelter Keyboard-Tab-Stop, fehlender `aria-label`, doppelter `:key` in `v-for`, Race Condition bei Live-Array-Iteration.
+
 ### Nächster Schritt
 
-**Schritt 7 – Upload-View** (Drag & Drop, Formular mit Gerätename, Fortschrittsanzeige)
+**Schritt 8 – Galerie-View** (Grid-Ansicht mit Thumbnails, Filter, Infinite Scroll oder Pagination)
 
 ---
 

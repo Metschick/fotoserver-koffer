@@ -1,0 +1,18 @@
+[project]
+name = "fotoserver-koffer"
+version = "0.1.0"
+description = "Modularer Fotoserver für den Raspberry Pi Hacking-Koffer"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Metschick" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

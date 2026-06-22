@@ -1,0 +1,56 @@
+# Umgebungsvariablen – NIEMALS committen
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Datenbank
+*.db
+*.sqlite
+*.sqlite3
+
+# Nutzerdaten – NIEMALS committen
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
+
+# Frontend Build
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets / Zertifikate
+*.pem
+*.key
+*.crt
+
+# Generierte Hotspot-Konfigurationen (enthalten Passwörter)
+hostapd.conf
+dnsmasq.conf

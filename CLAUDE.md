@@ -148,3 +148,78 @@ Bei Unsicherheiten:
 * Änderungen nachvollziehbar dokumentieren
 
 Ziel ist ein sauber aufgebautes, langfristig wartbares Projekt mit vollständiger Nachvollziehbarkeit aller wichtigen Entscheidungen.
+
+---
+
+## Architekturentscheidungen (2026-06-22)
+
+Vollständiger Plan: `plans/architektur-fotoserver-koffer.md`
+
+### Tech-Stack (bestätigt)
+
+| Schicht | Technologie | Begründung |
+|---|---|---|
+| Backend | FastAPI + Python 3.11 | ARM64-nativ, async, leichtgewichtig |
+| Datenbank | SQLite (WAL-Modus) | Kein DB-Server, für concurrent reads geeignet |
+| ORM | SQLModel | FastAPI-nativ, Pydantic-kompatibel |
+| Thumbnails | Pillow (Bilder) + ffmpeg (Videos) | ffmpeg via apt auf Kali ARM64 |
+| MIME-Prüfung | python-magic | Magic-Byte-Prüfung statt HTTP-Header |
+| Frontend | Vue 3 + Vite + Tailwind CSS | SPA, statische Ausgabe für Nginx |
+| Reverse Proxy | Nginx | Statische Files + API-Proxy |
+| Prozess-Manager | systemd | Kali-nativ, Auto-Start |
+| Hotspot | hostapd + dnsmasq | Standard auf Kali/Pi |
+| Deployment | pip + venv (kein Docker) | Ressourcensparend für Pi/Powerbank |
+
+### Sicherheitsentscheidungen (nach Review)
+
+* Dateinamen im Dateisystem: ausschließlich UUID4 + sanitierte Erweiterung
+* Original-Dateiname: nur als DB-Metadatum gespeichert, nie als Pfad
+* MIME-Typ: server-seitig per Magic Bytes geprüft (python-magic), nie per HTTP-Header
+* Album-Namen: Whitelist-Regex `^[a-zA-Z0-9_-]{1,50}$` vor Dateisystem-Verwendung
+* Nginx `/uploads/`: `X-Content-Type-Options: nosniff` + `Content-Disposition: attachment`
+* Upload-Limit: 100 MB pro Datei + Disk-Free-Space-Check vor Schreiben
+* hostapd.conf auf Pi: `chmod 600 chown root:root`
+* SQLite: `journal_mode=WAL` + `busy_timeout=5000`
+
+### Start/Stop-Konzept (bestätigt)
+
+Der Fotoserver darf nicht dauerhaft aktiv sein. Er wird bewusst gestartet und gestoppt.
+
+* **Normalbetrieb:** Pi läuft ohne Hotspot und ohne Webserver
+* **Fotoserver-Modus:** Hotspot + dnsmasq + nginx + FastAPI aktiv
+* **Umschaltung:** via `fotoserver-start.sh` / `fotoserver-stop.sh` (Wrapper um systemd)
+* **systemd Target:** `fotoserver.target` gruppiert alle Services — wird **nicht** aktiviert (kein Autostart beim Booten)
+* **Start-Reihenfolge:** hostapd → dnsmasq → fotoserver-api → nginx (systemd löst Abhängigkeiten auf)
+* **Admin-Toggle:** in Version 2 optional über Web-Interface (`POST /api/admin/server/stop`)
+* **Skripte:** `deploy/scripts/fotoserver-{start,stop,status,restart}.sh`
+
+### Bedienkonzept: Terminalfreie Steuerung (bestätigt)
+
+Langfristig kein Terminal erforderlich. Architektur ist von Anfang an darauf vorbereitet.
+
+**Invariante:** Alle Steuerungsbefehle gehen ausschließlich über `systemctl` → GUI-Code berührt niemals direkt Prozesse oder Netzwerkkonfiguration.
+
+Versionspfad:
+* **V1:** Shell-Skripte (Terminal) — Schritt 11
+* **V1.5:** Desktop-Shortcuts via `.desktop`-Dateien + PolicyKit (`deploy/desktop/`) — kein Backend-Umbau
+* **V2a:** GTK-System-Tray-App (`deploy/tray-app/fotoserver-tray.py`) — Status-Icon + Rechtsklick-Menü
+* **V2b:** Web-Admin-Interface (bereits geplant: `POST /api/admin/server/stop`)
+
+### Raspberry-Pi-spezifische Anpassungen
+
+* NetworkManager muss `wlan0` freigeben (unmanaged-devices) bevor hostapd startet
+* Frontend-Build läuft im CI (GitHub Actions), nicht auf dem Pi
+* `install.sh` lädt `dist/` als Release-Artefakt — kein Node.js auf dem Pi nötig
+
+### Frontend-Build-Strategie
+
+* Entwicklung: Vite Dev-Server mit API-Proxy auf Backend
+* Produktion: `npm run build` → `dist/` → GitHub Actions Release-Artefakt
+* Deployment: `install.sh` lädt `dist/` vom GitHub-Release, kein Node.js auf Pi
+
+### Designentscheidungen (2026-06-22, bestätigt)
+
+* **Frontend:** Vue 3 + Vite + Tailwind CSS; Build im CI, kein Node.js auf dem Pi
+* **Authentifizierung:** Einfaches gemeinsames Passwort (Upload + Galerie); separates Admin-Passwort für Lösch-Funktion; Session via HTTP-Only Cookie; Passwörter als bcrypt-Hash in `.env`
+* **Album-Struktur:** Automatisch `Gerätename/YYYY-MM-DD/`; Gerätename per Freitextfeld im Upload-Formular (Whitelist-validiert); manuelle Alben erst ab Version 2
+* **Lösch-Funktion:** Nur über Admin-Interface mit Admin-Passwort

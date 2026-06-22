@@ -275,9 +275,25 @@ Erstellt am 2026-06-22. Enthält:
 
 **ECC-Review-Ergebnis:** 2 HIGH + 5 MEDIUM gefunden und behoben — Object-URL-Leak auf Unmount, XHR nicht abgebrochen auf Unmount, doppelter Keyboard-Tab-Stop, fehlender `aria-label`, doppelter `:key` in `v-for`, Race Condition bei Live-Array-Iteration.
 
+#### Schritt 8 – Galerie-View (Commit: ausstehend)
+
+Erstellt am 2026-06-23. Enthält:
+
+* `frontend/src/api/client.ts`: `API_BASE`-Konstante exportiert (bisher intern); `fetchJson` nimmt `RequestInit` inkl. optionalem `signal` entgegen
+* `frontend/src/api/media.ts`: `fetchGallery(limit, offset, signal?)` via `fetchJson`; `fetchMediaBlob(id)` via `fetch()` + `URL.createObjectURL()` — lädt Originaldatei als Blob für Inline-Anzeige; `API_BASE`-Import ersetzt hartcodierten `/api`-Pfad
+* `frontend/src/components/GalleryGrid.vue`: Responsives Thumbnail-Raster (`grid-cols-2 / 3 / 4`); 50 Items pro Batch; „Mehr laden"-Button; Lade-Skeleton (8 pulsierende Kacheln); Leer-Zustand mit CTA-Link `/upload`; Video-Play-Overlay; Hover-Info-Overlay (Gerätename + Datum); `AbortController` gegen Fetch nach Unmount; `emit('open', item, [...items.value])` sendet Snapshot (verhindert implizites Shared-State mit Viewer)
+* `frontend/src/components/MediaViewer.vue`: `<Teleport to="body">` + `<Transition name="viewer-fade">`; Keyboard-Handler (`Escape`/`←`/`→`) via `document.addEventListener` — ausschließlich während Viewer offen (Lifecycle durch `v-if` in Parent sichergestellt); Body-Scroll-Lock via `onMounted`/`onUnmounted`; Blob-Loading mit Stale-ID-Guard (schnelles Navigieren überschreibt kein veraltetes Ergebnis); `aria-describedby="viewer-meta"`; kontextsensitive Pfeil-Labels (Bild vs. Video); Bilder: Blob-URL via `fetchMediaBlob`; Videos: Thumbnail-Vorschau + Download-Button (Inline-Wiedergabe in V1 nicht möglich, da `/file`-Endpunkt `Content-Disposition: attachment` setzt)
+* `frontend/src/views/GalleryView.vue`: `<MediaViewer v-if="viewerItem !== null">` — Viewer nur gemountet wenn offen; eliminiert globalen Keyboard-Listener-Leak und Body-Overflow-Leak vollständig
+
+**Build:** `vue-tsc && vite build` fehlerfrei (GalleryView-Chunk: 12.08 kB / gzip 4.16 kB).
+
+**ECC-Review-Ergebnis:** 3 HIGH + 6 MEDIUM gefunden und behoben — Race Condition bei schneller Navigation (Stale-ID-Guard), globaler Keyboard-Listener immer aktiv (`v-if`-Fix), Body-Scroll-Lock-Leak (`v-if`-Fix), `aria-describedby` fehlend, kontextblinde Pfeil-Labels, Emit von Live-Array statt Snapshot, hardcodierter `/api`-Pfad, fehlender `AbortController`.
+
+**Designentscheidung Video-Inline:** Videos können in V1 nicht inline abgespielt werden, da der `/api/media/{id}/file`-Endpunkt `Content-Disposition: attachment` setzt und Browser bei `<video src="...">` dann den Download triggern statt zu streamen. Lösung für V2: separater `/api/media/{id}/view`-Endpunkt ohne Content-Disposition.
+
 ### Nächster Schritt
 
-**Schritt 8 – Galerie-View** (Grid-Ansicht mit Thumbnails, Filter, Infinite Scroll oder Pagination)
+**Schritt 9 – Nginx-Konfiguration** (Reverse Proxy, statische Files, Upload-Sicherheits-Header)
 
 ---
 

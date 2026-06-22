@@ -1,3 +1,5 @@
+import { API_BASE, fetchJson } from './client'
+
 export interface MediaRead {
   id: number
   filename: string
@@ -35,7 +37,7 @@ export function uploadFile(
 
     const xhr = new XMLHttpRequest()
     xhrRef = xhr
-    xhr.open('POST', '/api/upload')
+    xhr.open('POST', `${API_BASE}/upload`)
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -69,4 +71,25 @@ export function uploadFile(
     promise,
     abort: () => xhrRef?.abort(),
   }
+}
+
+export function fetchGallery(limit = 50, offset = 0, signal?: AbortSignal): Promise<GalleryPage> {
+  return fetchJson<GalleryPage>(
+    `/gallery?limit=${limit}&offset=${offset}`,
+    signal ? { signal } : undefined,
+  )
+}
+
+export async function fetchMediaBlob(mediaId: number): Promise<string> {
+  const resp = await fetch(`${API_BASE}/media/${mediaId}/file`)
+  if (!resp.ok) {
+    let detail = resp.statusText
+    try {
+      const body = await resp.json() as { detail?: string }
+      if (body.detail) detail = body.detail
+    } catch { /* ignore */ }
+    throw new Error(`Fehler ${resp.status}: ${detail}`)
+  }
+  const blob = await resp.blob()
+  return URL.createObjectURL(blob)
 }

@@ -1,17 +1,36 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import GalleryGrid from '@/components/GalleryGrid.vue'
+import MediaViewer from '@/components/MediaViewer.vue'
+import type { MediaRead } from '@/api/media'
+
+const viewerItem = ref<MediaRead | null>(null)
+const viewerItems = ref<MediaRead[]>([])
+
+function openViewer(item: MediaRead, items: MediaRead[]) {
+  viewerItem.value = item
+  viewerItems.value = items
+}
+
+function closeViewer() {
+  viewerItem.value = null
+}
+</script>
+
 <template>
   <div>
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
       Galerie
     </h1>
-
-    <!-- Platzhalter – wird in Schritt 8 durch GalleryGrid ersetzt -->
-    <div class="text-center py-16">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 mx-auto mb-4 text-gray-400 dark:text-gray-500">
-        <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
-      </svg>
-      <p class="text-gray-500 dark:text-gray-400">
-        Galerie-Ansicht folgt in Schritt 8
-      </p>
-    </div>
+    <GalleryGrid @open="openViewer" />
+    <!-- v-if ensures MediaViewer only mounts when open:
+         keyboard listener, body scroll lock and blob URL cleanup
+         are all tied to onMounted/onUnmounted and never leak. -->
+    <MediaViewer
+      v-if="viewerItem !== null"
+      :item="viewerItem"
+      :items="viewerItems"
+      @close="closeViewer"
+    />
   </div>
 </template>

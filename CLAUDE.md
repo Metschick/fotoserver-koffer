@@ -291,9 +291,24 @@ Erstellt am 2026-06-23. Enthält:
 
 **Designentscheidung Video-Inline:** Videos können in V1 nicht inline abgespielt werden, da der `/api/media/{id}/file`-Endpunkt `Content-Disposition: attachment` setzt und Browser bei `<video src="...">` dann den Download triggern statt zu streamen. Lösung für V2: separater `/api/media/{id}/view`-Endpunkt ohne Content-Disposition.
 
+#### Schritt 9 – Nginx-Konfiguration (Commit: ausstehend)
+
+Erstellt am 2026-06-23. Enthält:
+
+* `deploy/nginx/fotoserver.conf`: Nginx-Server-Block — SPA-Fallback (`try_files`); Asset-Cache nur für `/assets/.*` (Vite-Hashes, `Cache-Control: public, immutable, 1y`); API-Proxy auf `127.0.0.1:8000` mit `client_max_body_size 110M` und 180s-Timeouts; gzip für Text/JSON/JS/CSS; Access- und Error-Log
+* `deploy/scripts/setup-nginx.sh`: idempotentes Einrichtungsskript — Root-Check, nginx-Check, Pfad-Validierung (`^/[a-zA-Z0-9._/-]+$`), `sed`-Substitution des Template-Pfads, Backup der bestehenden Config, atomares Schreiben + `nginx -t`-Validierung vor Aktivierung, `ln -sf` in `sites-enabled`, Standard-Site deaktivieren
+* `frontend/public/theme-init.js`: FOUC-Inline-Script aus `index.html` ausgelagert — ermöglicht `script-src 'self'` in CSP ohne `'unsafe-inline'`
+* `frontend/index.html`: Inline-Script durch `<script src="/theme-init.js">` (synchron, kein defer — FOUC-Schutz bleibt erhalten) ersetzt
+
+**Sicherheits-Header (alle Responses):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `X-XSS-Protection: 0`, `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'`
+
+**Nginx-`add_header`-Vererbung:** Locations mit eigenem `add_header` erben nicht den `server`-Block → alle Security-Header im `/assets/`-Location-Block explizit wiederholt.
+
+**ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — unvalidierter `$INSTALL_DIR` in `sed` (Injection-Schutz: Regex-Validierung), zu breite Asset-Regex (Einschränkung auf `^/assets/`), `Host: $host` durch `Host: 127.0.0.1` ersetzt, Config-Schreiben nach Backup + `nginx -t`-Validierung, CSP ergänzt.
+
 ### Nächster Schritt
 
-**Schritt 9 – Nginx-Konfiguration** (Reverse Proxy, statische Files, Upload-Sicherheits-Header)
+**Schritt 10 – systemd-Service** (`fotoserver-api.service`, `fotoserver.target`)
 
 ---
 

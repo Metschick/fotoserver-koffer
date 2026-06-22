@@ -242,7 +242,7 @@ Erstellt am 2026-06-22. Enthält:
 
 **API-Designentscheidung:** Album-Pfad mit zwei getrennten URL-Segmenten `{device_name}/{date_str}` statt `{album:path}` — sauberer, kein Path-Parameter mit Slash.
 
-#### Schritt 6 – Frontend-Grundgerüst (Commit: ausstehend)
+#### Schritt 6 – Frontend-Grundgerüst (Commits: ff41569, 9916dd3)
 
 Erstellt am 2026-06-22. Enthält:
 
@@ -261,7 +261,9 @@ Erstellt am 2026-06-22. Enthält:
 
 **UI-Entscheidungen:** Deutsch, Dark/Light Mode mit System-Präferenz + Toggle + LocalStorage (bestätigt vor diesem Schritt).
 
-#### Schritt 7 – Upload-View (Commit: ausstehend)
+**Sicherheits-Nachbesserung (Commit: 9916dd3):** Vite 5 enthielt CVE GHSA-67mh-4wv8-2f99 (esbuild Dev-Server — unberechtigter Zugriff auf lokale Dateien). Upgrade auf Vite 8 + `@vitejs/plugin-vue` 6 + `vue-tsc` 3 → 0 bekannte Schwachstellen. Node.js wurde via nvm (ohne Root) auf Version 20.20.2 installiert.
+
+#### Schritt 7 – Upload-View (Commit: f9d78b2)
 
 Erstellt am 2026-06-22. Enthält:
 

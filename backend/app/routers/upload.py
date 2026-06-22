@@ -7,6 +7,7 @@ from app.config import Settings, get_settings
 from app.database import get_session
 from app.models.media import MediaRead
 from app.services.storage import StorageService
+from app.services.thumbnail import ThumbnailService
 from app.utils.file_utils import (
     check_disk_space,
     detect_mime_type,
@@ -66,4 +67,13 @@ async def upload_file(
         media.size_bytes,
         device_name,
     )
+
+    source_path = settings.upload_dir / media.album_path / media.stored_as
+    thumb_rel = ThumbnailService(settings.upload_dir).generate(source_path, media.mime_type)
+    if thumb_rel:
+        media.thumb_path = thumb_rel
+        session.add(media)
+        session.commit()
+        session.refresh(media)
+
     return MediaRead.from_media(media)

@@ -196,16 +196,48 @@ Erstellt am 2026-06-22. Enthält:
 
 **Teststatus:** 2/2 grün, ruff clean, keine Warnungen.
 
+#### Schritt 3 – Upload-System (Commit: a6bfb95)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `backend/app/utils/file_utils.py`: MIME-Prüfung via python-magic (Magic Bytes); `validate_device_name()` mit Whitelist-Regex; `safe_extension()` aus festem MIME→Erweiterung-Mapping; `check_disk_space()`
+* `backend/app/services/storage.py`: `StorageService.save()` — atomarer Schreibvorgang via `tempfile.mkstemp()` + `os.replace()`; DB-Rollback mit Datei-Cleanup bei Commit-Fehler; Ordnerstruktur `upload_dir/Gerätename/YYYY-MM-DD/`
+* `backend/app/routers/upload.py`: `POST /api/upload` — Streaming-Read (`max_bytes + 1`), MIME-Prüfung per Magic Bytes, Disk-Space-Check, 201-Response
+* `backend/app/models/media.py`: `MediaRead`-Schema für API-Antworten
+* `backend/tests/test_upload.py`: 15 Tests (Erfolg, zu groß, falscher MIME-Typ, leere Datei, ungültiger/fehlender Gerätename, Grenzwerte, volle Festplatte)
+* `backend/tests/constants.py`: `TEST_SECRET_KEY` als zentrale Testkonstante
+
+**Teststatus:** 15/15 grün, ruff clean.
+
+**Auth-Entscheidung:** Kein Web-Login für normale Nutzer. WLAN-Passwort des Hotspots ist primäre Authentifizierung. Upload und Galerie für alle Geräte im Hotspot-Netz offen.
+
+#### Schritt 4 – Thumbnail-Generierung (Commit: ausstehend)
+
+Erstellt am 2026-06-22. Enthält:
+
+* `backend/app/services/thumbnail.py`: `ThumbnailService` — Bilder via Pillow (EXIF-Transpose, RGB-Konvertierung, Resampling.LANCZOS, max 300×300); Videos via ffmpeg-Subprocess (erster Frame); graceful failure (Exceptions werden abgefangen, `None` zurückgegeben); Zombie-Prozess-Prevention bei `TimeoutExpired`
+* Thumbnail-Pfad: `upload_dir/Gerätename/YYYY-MM-DD/thumbnails/UUID_thumb.jpg`; im DB-Feld `thumb_path` als relativer Pfad gespeichert
+* Kein Orphan-Verzeichnis: `thumbnails/`-Dir wird erst angelegt wenn Pillow die Datei öffnen kann (Bilder) bzw. bei ffmpeg-Fehler wieder entfernt (Videos)
+* `backend/app/models/media.py`: `MediaRead` um `thumb_path: Optional[str]` erweitert
+* `backend/app/routers/upload.py`: Thumbnail-Generierung nach erfolgreichem Upload; Fehler blockieren Upload nicht
+* `backend/tests/test_thumbnail.py`: 11 Tests (JPEG, PNG, Landscape-Ratio, kein Upscaling, korrupte Datei, kein Orphan-Dir, ungültiger MIME, ffmpeg nicht gefunden, ffmpeg-Fehler, kein Video-Orphan-Dir)
+* `backend/tests/conftest.py`: `valid_jpeg`-Fixture (Pillow-erzeugtes Testbild)
+* `backend/tests/test_upload.py`: Integrationstest `test_upload_valid_jpeg_sets_thumb_path`
+
+**Teststatus:** 27/27 grün, ruff clean.
+
+**Thumbnail-Entscheidung:** Synchrone Generierung (kein BackgroundTask in V1 — vereinfacht Fehlerbehandlung und ist auf Pi für lokale Uploads akzeptabel). `thumb_path` kann `null` sein wenn Generierung fehlschlägt (Upload trotzdem 201).
+
 ### Nächster Schritt
 
-**Schritt 3 – Upload-System** (noch nicht begonnen)
+**Schritt 5 – Galerie-API** (noch nicht begonnen)
 
 Geplanter Inhalt:
-* `POST /api/upload`: Datei-Upload (multipart/form-data)
-* `backend/app/services/storage.py`: Dateispeicherung mit UUID4-Dateinamen, Ordnerstruktur `Gerätename/YYYY-MM-DD/`
-* `backend/app/utils/file_utils.py`: MIME-Prüfung via python-magic (Magic Bytes), Dateinamen-Sanitierung, Disk-Space-Check
-* Authentifizierung: Nutzer-Passwort-Middleware (bcrypt-Vergleich, HTTP-Only Cookie)
-* Tests: Upload-Erfolg, zu große Datei, ungültiger MIME-Typ, volle Festplatte
+* `GET /api/gallery`: Liste aller Alben (`Gerätename/YYYY-MM-DD`)
+* `GET /api/gallery/{album}`: Medien in einem Album
+* `GET /api/media/{id}`: Einzelnes Medium (Metadaten)
+* `GET /api/media/{id}/thumb`: Thumbnail-Datei ausliefern
+* `GET /api/media/{id}/file`: Originaldatei ausliefern
 
 ---
 

@@ -171,6 +171,18 @@ def test_upload_missing_device_name(client):
     assert resp.status_code == 422
 
 
+def test_upload_valid_jpeg_sets_thumb_path(client, valid_jpeg, upload_dir):
+    resp = client.post(
+        "/api/upload",
+        files={"file": ("photo.jpg", valid_jpeg, "image/jpeg")},
+        data={"device_name": "test-device"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["thumb_path"] is not None
+    assert (upload_dir / body["thumb_path"]).exists()
+
+
 def test_upload_disk_full(client, monkeypatch):
     def _raise_disk_full(*_args, **_kwargs):
         raise OSError("Disk full")

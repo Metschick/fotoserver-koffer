@@ -51,6 +51,7 @@ class MediaRead(BaseModel):
     device_name: str
     uploaded_at: datetime
     album_path: str
+    thumb_path: Optional[str]
 
     @classmethod
     def from_media(cls, m: Media) -> "MediaRead":
@@ -62,4 +63,5 @@ class MediaRead(BaseModel):
             device_name=m.device_name,
             uploaded_at=m.uploaded_at,
             album_path=m.album_path,
+            thumb_path=m.thumb_path,
         )

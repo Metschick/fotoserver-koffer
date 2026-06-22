@@ -1,7 +1,9 @@
+import io
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import event as sa_event
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
@@ -45,6 +47,14 @@ def test_settings_fixture(upload_dir: Path, tmp_path: Path) -> Settings:
         upload_dir=upload_dir,
         data_dir=tmp_path / "data",
     )
+
+
+@pytest.fixture(name="valid_jpeg")
+def valid_jpeg_fixture() -> bytes:
+    """Vollständiges JPEG-Bild, das Pillow verarbeiten kann."""
+    buf = io.BytesIO()
+    Image.new("RGB", (200, 200), color=(100, 150, 200)).save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 @pytest.fixture(name="client")

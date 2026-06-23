@@ -329,9 +329,24 @@ Erstellt am 2026-06-23. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — `ProtectSystem=full` → `strict` + `ReadWritePaths`, fehlende Hardening-Direktiven ergänzt, `.env`-Berechtigungshinweis in Setup-Script, nicht-atomares Schreiben → `mktemp`+`mv`, fehlende `BindsTo` in Drop-ins; 1 neues MEDIUM (INSTALL_DIR unter `/home` bricht `ProtectHome`) ebenfalls behoben.
 
+#### Schritt 11 – Start/Stop-Skripte (Commit: ausstehend)
+
+Erstellt am 2026-06-24. Enthält:
+
+* `deploy/scripts/fotoserver-start.sh`: Root-Check; `systemctl cat`-Prüfung (Target installiert?); Idempotenz-Check; `systemctl start fotoserver.target`; Polling-Loop (bis 10 s) bis Target `active`; ruft `fotoserver-status.sh` auf; Exit 1 wenn Target nicht aktiv wurde
+* `deploy/scripts/fotoserver-stop.sh`: Root-Check; Idempotenz-Check (bereits inaktiv → Status anzeigen + Exit 0); `systemctl stop fotoserver.target`; ruft `fotoserver-status.sh` auf
+* `deploy/scripts/fotoserver-status.sh`: Kein Root nötig; zeigt `is-active`-Status für hostapd, dnsmasq, fotoserver-api, nginx + fotoserver.target; Hinweis auf Logs / Start/Stop-Befehl
+* `deploy/scripts/fotoserver-restart.sh`: Root-Check; Guard: Fehler wenn Target nicht aktiv (kein ungewolltes Aktivieren); Stop → Start → Polling-Loop; Exit 1 wenn Target nach Neustart nicht aktiv
+
+**Sicherheits-Muster in allen Root-Skripten:** Vor dem Aufruf von `fotoserver-status.sh` wird via `stat -c '%U'` geprüft, dass das Skript `root` gehört — verhindert Privilege Escalation falls `deploy/scripts/` nicht korrekt gesichert ist.
+
+**Sudo-Strategie V1:** Operator ruft Skripte manuell mit `sudo` auf — kein sudoers-Eintrag nötig. PolicyKit-Integration folgt in Schritt 12 (Desktop-Shortcuts).
+
+**ECC-Security-Review-Ergebnis:** 4 MEDIUM + 3 LOW gefunden und behoben — Ownership-Check für Status-Skript (Privilege Escalation), `dirname` → `SCRIPT_DIR`-Muster in status.sh, Timeout-Loop ohne Fehlercode → Exit 1 nach Polling, totes `WAS_ACTIVE`-Flag + unbedingter Start in restart.sh → Guard, `$(seq)` → `{1..10}`, `grep`-basierter Unit-Check → `systemctl cat`, stop.sh zeigt jetzt Status auch wenn bereits inaktiv.
+
 ### Nächster Schritt
 
-**Schritt 11 – Start/Stop-Skripte** (`fotoserver-start.sh`, `fotoserver-stop.sh`, `fotoserver-status.sh`, `fotoserver-restart.sh`)
+**Schritt 12 – Desktop-Shortcuts** (`.desktop`-Dateien + PolicyKit-Regel)
 
 ---
 

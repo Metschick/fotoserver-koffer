@@ -306,9 +306,32 @@ Erstellt am 2026-06-23. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — unvalidierter `$INSTALL_DIR` in `sed` (Injection-Schutz: Regex-Validierung), zu breite Asset-Regex (Einschränkung auf `^/assets/`), `Host: $host` durch `Host: 127.0.0.1` ersetzt, Config-Schreiben nach Backup + `nginx -t`-Validierung, CSP ergänzt.
 
+#### Schritt 10 – systemd-Service (Commit: ausstehend)
+
+Erstellt am 2026-06-23. Enthält:
+
+* `deploy/systemd/fotoserver-api.service`: FastAPI-Backend-Service — dedizierter Systemnutzer `fotoserver` (kein Login, kein Home); `WorkingDirectory=/opt/fotoserver`; `PYTHONPATH=/opt/fotoserver/backend` (damit `uvicorn app.main:app` das Paket findet); `EnvironmentFile=/opt/fotoserver/.env`; `Restart=on-failure`, `RestartSec=5s`, `TimeoutStopSec=30s`; `StartLimitIntervalSec=60s / StartLimitBurst=3` in `[Unit]`; `PartOf=fotoserver.target`
+* `deploy/systemd/fotoserver.target`: Gruppen-Target für alle vier Services — `Wants=hostapd dnsmasq fotoserver-api nginx`; kein `[Install]`-Abschnitt (kein Autostart beim Booten); Startreihenfolge via `After=`
+* `deploy/systemd/nginx.service.d/fotoserver.conf`: Drop-in — `PartOf=fotoserver.target`, `BindsTo=fotoserver.target`, `After=fotoserver-api.service`
+* `deploy/systemd/hostapd.service.d/fotoserver.conf`: Drop-in — `PartOf=fotoserver.target`, `BindsTo=fotoserver.target` (kein `After=fotoserver.target` — würde zirkuläre Abhängigkeit erzeugen)
+* `deploy/systemd/dnsmasq.service.d/fotoserver.conf`: Drop-in — `PartOf=fotoserver.target`, `BindsTo=fotoserver.target`, `After=hostapd.service`
+* `deploy/scripts/setup-systemd.sh`: Systemnutzer anlegen, Verzeichnisse anlegen, Unit-Dateien atomisch installieren (`mktemp` + `mv`), Drop-ins atomisch installieren, `daemon-reload`; Validierung: Regex für INSTALL_DIR + Schutz gegen `/home`/`/root` (wegen `ProtectHome=yes`)
+
+**Security-Hardening `fotoserver-api.service`:** `ProtectSystem=strict` + `ReadWritePaths=/opt/fotoserver/uploads /opt/fotoserver/data`; `PrivateDevices=yes`; `CapabilityBoundingSet=` (alle Capabilities entfernt); `SystemCallFilter=@system-service`; `ProtectKernelModules`, `ProtectKernelTunables`, `ProtectControlGroups`; `LockPersonality`, `RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID`; `UMask=0027`
+
+**Wichtig für Deployment:** `.env`-Datei muss nach dem Anlegen mit `chmod 600 / chown root:root` gesichert werden. systemd liest sie als root und übergibt Werte als Umgebungsvariablen — der `fotoserver`-Prozess selbst greift nie auf die Datei zu.
+
+**Lifecycle-Verhalten:**
+- `systemctl start fotoserver.target` → startet alle vier Services in Reihenfolge
+- `systemctl stop fotoserver.target` → stoppt alle vier (via `PartOf=`)
+- Wenn das Target in `failed` geht → auch nginx/hostapd/dnsmasq stoppen (via `BindsTo=`)
+- `fotoserver.target` wird NICHT aktiviert (kein Autostart beim Booten)
+
+**ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — `ProtectSystem=full` → `strict` + `ReadWritePaths`, fehlende Hardening-Direktiven ergänzt, `.env`-Berechtigungshinweis in Setup-Script, nicht-atomares Schreiben → `mktemp`+`mv`, fehlende `BindsTo` in Drop-ins; 1 neues MEDIUM (INSTALL_DIR unter `/home` bricht `ProtectHome`) ebenfalls behoben.
+
 ### Nächster Schritt
 
-**Schritt 10 – systemd-Service** (`fotoserver-api.service`, `fotoserver.target`)
+**Schritt 11 – Start/Stop-Skripte** (`fotoserver-start.sh`, `fotoserver-stop.sh`, `fotoserver-status.sh`, `fotoserver-restart.sh`)
 
 ---
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=Fotoserver-Koffer
+Documentation=https://github.com/Metschick/fotoserver-koffer
+
+# Alle vier Services werden mit diesem Target gestartet.
+# Reihenfolge: hostapd → dnsmasq → fotoserver-api → nginx
+Wants=hostapd.service dnsmasq.service fotoserver-api.service nginx.service
+After=hostapd.service dnsmasq.service fotoserver-api.service nginx.service
+
+# KEIN [Install]-Abschnitt — dieses Target soll NICHT aktiviert werden.
+# Kein Autostart beim Booten. Manuell starten: sudo systemctl start fotoserver.target

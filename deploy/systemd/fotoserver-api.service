@@ -1,0 +1,82 @@
+[Unit]
+Description=Fotoserver-Koffer FastAPI Backend
+Documentation=https://github.com/Metschick/fotoserver-koffer
+# Startet erst wenn Netzwerk, Hotspot und DHCP bereit sind
+After=network.target hostapd.service dnsmasq.service
+Requires=network.target
+# PartOf: beim Stop/Restart von fotoserver.target wird dieser Service mitgestoppt
+PartOf=fotoserver.target
+# Max. 3 Neustarts innerhalb von 60 Sekunden, danach failed-State
+# (muss in [Unit] stehen; in [Service] werden diese Direktiven ab systemd 229 ignoriert)
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=fotoserver
+Group=fotoserver
+
+# Arbeitsverzeichnis = Install-Root; UPLOAD_DIR=./uploads und DATA_DIR=./data
+# aus der .env lösen dann zu /opt/fotoserver/uploads und /opt/fotoserver/data auf.
+# setup-systemd.sh ersetzt /opt/fotoserver durch den tatsächlichen Installationspfad.
+WorkingDirectory=/opt/fotoserver
+
+# PYTHONPATH damit "uvicorn app.main:app" das backend/app-Paket findet
+Environment=PYTHONPATH=/opt/fotoserver/backend
+
+# Laufzeit-Konfiguration aus .env (NIEMALS committen!)
+# Datei muss chmod 600 / chown root:root haben (wird in setup-systemd.sh dokumentiert)
+EnvironmentFile=/opt/fotoserver/.env
+
+ExecStart=/opt/fotoserver/backend/venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 1 \
+    --log-level info
+
+# Bei Absturz neu starten; bei absichtlichem Stop (systemctl stop) nicht
+Restart=on-failure
+RestartSec=5s
+
+# Graceful-Shutdown-Timeout: gibt uvicorn Zeit laufende Requests abzuschließen
+TimeoutStopSec=30s
+
+# Logging über systemd-Journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fotoserver-api
+
+# ── Sicherheits-Härtung ───────────────────────────────────────────────────
+# Kein Privilege Escalation durch den Prozess selbst
+NoNewPrivileges=yes
+# Privates /tmp – isoliert von anderen Prozessen
+PrivateTmp=yes
+# Kein Zugriff auf physische Geräte (/dev/mem, /dev/kmem, Block Devices usw.)
+PrivateDevices=yes
+# Gesamtes Dateisystem read-only; nur explizit freigegebene Pfade schreibbar.
+# Schützt Backend-Code und venv vor Überschreiben durch einen kompromittierten Prozess.
+ProtectSystem=strict
+ReadWritePaths=/opt/fotoserver/uploads /opt/fotoserver/data
+# Kein Zugriff auf /home und /root
+ProtectHome=yes
+# Kernel-Schnittstellen sperren
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+# Weitere Einschränkungen
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+# Alle Capabilities entfernen; uvicorn bindet auf Port 8000 (kein CAP_NET_BIND_SERVICE nötig)
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Syscall-Filter: erlaubt nur Syscalls die für einen Daemon sinnvoll sind
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# Neue Dateien nicht world-readable anlegen (Uploads, SQLite-DB)
+UMask=0027
+
+[Install]
+WantedBy=fotoserver.target

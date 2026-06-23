@@ -329,7 +329,7 @@ Erstellt am 2026-06-23. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — `ProtectSystem=full` → `strict` + `ReadWritePaths`, fehlende Hardening-Direktiven ergänzt, `.env`-Berechtigungshinweis in Setup-Script, nicht-atomares Schreiben → `mktemp`+`mv`, fehlende `BindsTo` in Drop-ins; 1 neues MEDIUM (INSTALL_DIR unter `/home` bricht `ProtectHome`) ebenfalls behoben.
 
-#### Schritt 11 – Start/Stop-Skripte (Commit: ausstehend)
+#### Schritt 11 – Start/Stop-Skripte (Commit: 407d8a7)
 
 Erstellt am 2026-06-24. Enthält:
 

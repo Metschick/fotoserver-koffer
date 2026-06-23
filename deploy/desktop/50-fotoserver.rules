@@ -1,0 +1,38 @@
+/*
+ * PolicyKit-Regel für den Fotoserver-Koffer
+ * Installationspfad: /etc/polkit-1/rules.d/50-fotoserver.rules
+ *
+ * Mitglieder der Gruppe "fotoserver-admin" dürfen die Fotoserver-Steuerskripte
+ * über pkexec ohne Passwort ausführen.
+ *
+ * Gruppe anlegen:  sudo groupadd fotoserver-admin
+ * User hinzufügen: sudo usermod -aG fotoserver-admin <username>
+ * Wirksam nach:    Ab dem nächsten Login (oder: newgrp fotoserver-admin)
+ *
+ * setup-desktop.sh ersetzt /opt/fotoserver durch den tatsächlichen Installationspfad.
+ */
+polkit.addRule(function(action, subject) {
+    var ALLOWED_PROGRAMS = [
+        "/opt/fotoserver/deploy/scripts/fotoserver-start.sh",
+        "/opt/fotoserver/deploy/scripts/fotoserver-stop.sh",
+        "/opt/fotoserver/deploy/scripts/fotoserver-restart.sh"
+    ];
+
+    if (action.id === "org.freedesktop.policykit.exec") {
+        var program = action.lookup("program");
+        var programAllowed = false;
+
+        for (var i = 0; i < ALLOWED_PROGRAMS.length; i++) {
+            if (program === ALLOWED_PROGRAMS[i]) {
+                programAllowed = true;
+                break;
+            }
+        }
+
+        if (programAllowed && subject.isInGroup("fotoserver-admin")) {
+            return polkit.Result.YES;
+        }
+    }
+    // Explizit: alle anderen Aktionen werden an die nächste Regel weitergegeben
+    return polkit.Result.NOT_HANDLED;
+});

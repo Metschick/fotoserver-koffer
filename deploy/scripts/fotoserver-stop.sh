@@ -12,14 +12,14 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Sicherheitscheck: Status-Skript muss root gehören
-if [[ ! -f "$STATUS_SCRIPT" ]]; then
-    echo "Fehler: $STATUS_SCRIPT nicht gefunden." >&2
+# Sicherheitscheck: Skript-Verzeichnis muss root gehören
+if [[ "$(stat -c '%U' "$SCRIPT_DIR")" != "root" ]]; then
+    echo "Fehler: $SCRIPT_DIR gehört nicht root." >&2
+    echo "  Bitte ausführen: sudo ${SCRIPT_DIR}/setup-desktop.sh" >&2
     exit 1
 fi
-if [[ "$(stat -c '%U' "$STATUS_SCRIPT")" != "root" ]]; then
-    echo "Fehler: $STATUS_SCRIPT gehört nicht root." >&2
-    echo "  Bitte Verzeichnisrechte prüfen: chown root:root $STATUS_SCRIPT" >&2
+if [[ ! -f "$STATUS_SCRIPT" ]]; then
+    echo "Fehler: $STATUS_SCRIPT nicht gefunden." >&2
     exit 1
 fi
 

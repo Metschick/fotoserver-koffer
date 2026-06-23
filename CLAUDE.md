@@ -344,9 +344,25 @@ Erstellt am 2026-06-24. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 4 MEDIUM + 3 LOW gefunden und behoben — Ownership-Check für Status-Skript (Privilege Escalation), `dirname` → `SCRIPT_DIR`-Muster in status.sh, Timeout-Loop ohne Fehlercode → Exit 1 nach Polling, totes `WAS_ACTIVE`-Flag + unbedingter Start in restart.sh → Guard, `$(seq)` → `{1..10}`, `grep`-basierter Unit-Check → `systemctl cat`, stop.sh zeigt jetzt Status auch wenn bereits inaktiv.
 
+#### Schritt 12 – Desktop-Shortcuts (Commit: ausstehend)
+
+Erstellt am 2026-06-24. Enthält:
+
+* `deploy/desktop/fotoserver-{start,stop,status,restart}.desktop`: Vier `.desktop`-Dateien für Kali XFCE/GNOME — `Terminal=true`; Start/Stop/Restart via `bash -c 'pkexec <script>; read -r dummy'`; Status ohne pkexec (kein Root nötig); Kategorien `System;Network;`
+* `deploy/desktop/50-fotoserver.rules`: PolicyKit-JavaScript-Regel — Mitglieder der Gruppe `fotoserver-admin` dürfen start/stop/restart-Skripte via pkexec ohne Passwort ausführen; explizites `polkit.Result.NOT_HANDLED` für alle anderen Aktionen; Pfade enthalten `/opt/fotoserver`-Platzhalter (sed-Substitution durch setup-desktop.sh)
+* `deploy/scripts/setup-desktop.sh`: Root-Check; `realpath -m`-Normalisierung + Abweichungs-Check gegen `..`-Traversal; Gruppe `fotoserver-admin` anlegen; optional: Benutzer zur Gruppe hinzufügen; PolicyKit-Regel atomisch installieren; **Skript-Verzeichnis und alle Steuerskripte auf `root:root 755` setzen** (sichert pkexec-Berechtigungsgrenze); Desktop-Dateien atomisch nach `/usr/share/applications/` installieren; optionaler Desktop-Symlink mit `USER_HOME`-Validierung; `update-desktop-database`
+
+**Sicherheits-Kette:** Desktop-Klick → `bash -c 'pkexec <script>'` → polkit prüft: exakter Pfad UND Gruppe `fotoserver-admin` → `polkit.Result.YES` → Skript läuft als root via systemctl
+
+**Ownership-Invariante:** `setup-desktop.sh` setzt nach der polkit-Regel-Installation `root:root 755` auf das gesamte `deploy/scripts/`-Verzeichnis und alle vier Steuerskripte. Damit ist sichergestellt, dass ein unprivilegierter Nutzer die durch polkit autorisierten Skripte nicht austauschen kann.
+
+**ECC-Security-Review-Ergebnis:** 2 HIGH + 4 MEDIUM gefunden und behoben — fehlende Skript-Ownership-Sicherung in setup-desktop.sh (HIGH), `..`-Traversal in INSTALL_DIR-Regex via `realpath -m` + Abweichungs-Check (HIGH), fehlende Gruppe in `chown` für Desktop-Dateien (MEDIUM), `USER_HOME`-Validierung (MEDIUM), TMP_FILES-Array für vollständige trap-Abdeckung (MEDIUM), restart.sh startet jetzt auch wenn Fotoserver nicht aktiv war (MEDIUM-Usability); LOW: `read -r dummy`, explizites `NOT_HANDLED`.
+
+**Offener Punkt für andere Setup-Skripte:** `setup-nginx.sh` und `setup-systemd.sh` verwenden dieselbe `INSTALL_DIR`-Regex ohne `realpath`-Normalisierung. Fix ist in Schritt 13 (install.sh) vorgesehen.
+
 ### Nächster Schritt
 
-**Schritt 12 – Desktop-Shortcuts** (`.desktop`-Dateien + PolicyKit-Regel)
+**Schritt 13 – Install-Skript** (`install.sh`)
 
 ---
 

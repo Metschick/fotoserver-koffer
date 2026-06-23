@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Fotoserver neu starten
+Comment=Alle Fotoserver-Dienste neu starten (z. B. nach Code-Update)
+Icon=view-refresh
+Exec=bash -c 'pkexec /opt/fotoserver/deploy/scripts/fotoserver-restart.sh; printf "\n--- Fertig. Enter zum Schließen ---"; read -r dummy'
+Terminal=true
+Categories=System;Network;
+StartupNotify=false

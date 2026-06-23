@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Fotoserver starten
+Comment=Fotoserver-Modus aktivieren (Hotspot + DHCP + Backend + Nginx)
+Icon=network-wireless
+# pkexec übernimmt Rechteeskalation via PolicyKit.
+# Terminal=true öffnet ein Terminalfenster damit der Operator den Fortschritt sieht.
+# "read -r dummy" hält das Fenster offen bis der Operator Enter drückt.
+# setup-desktop.sh ersetzt /opt/fotoserver durch den tatsächlichen Installationspfad.
+Exec=bash -c 'pkexec /opt/fotoserver/deploy/scripts/fotoserver-start.sh; printf "\n--- Fertig. Enter zum Schließen ---"; read -r dummy'
+Terminal=true
+Categories=System;Network;
+StartupNotify=false

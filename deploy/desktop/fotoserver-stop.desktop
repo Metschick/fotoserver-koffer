@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Fotoserver stoppen
+Comment=Fotoserver-Modus beenden (Hotspot + DHCP + Backend + Nginx stoppen)
+Icon=network-offline
+Exec=bash -c 'pkexec /opt/fotoserver/deploy/scripts/fotoserver-stop.sh; printf "\n--- Fertig. Enter zum Schließen ---"; read -r dummy'
+Terminal=true
+Categories=System;Network;
+StartupNotify=false

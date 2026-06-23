@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Fotoserver Status
+Comment=Status aller Fotoserver-Dienste anzeigen (kein Root nötig)
+Icon=dialog-information
+# Kein pkexec: status.sh benötigt keine Root-Rechte
+Exec=bash -c '/opt/fotoserver/deploy/scripts/fotoserver-status.sh; printf "\n--- Enter zum Schließen ---"; read -r dummy'
+Terminal=true
+Categories=System;Network;
+StartupNotify=false

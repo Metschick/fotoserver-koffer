@@ -306,7 +306,7 @@ Erstellt am 2026-06-23. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 2 HIGH + 3 MEDIUM gefunden und behoben — unvalidierter `$INSTALL_DIR` in `sed` (Injection-Schutz: Regex-Validierung), zu breite Asset-Regex (Einschränkung auf `^/assets/`), `Host: $host` durch `Host: 127.0.0.1` ersetzt, Config-Schreiben nach Backup + `nginx -t`-Validierung, CSP ergänzt.
 
-#### Schritt 10 – systemd-Service (Commit: ausstehend)
+#### Schritt 10 – systemd-Service (Commit: 806226b)
 
 Erstellt am 2026-06-23. Enthält:
 

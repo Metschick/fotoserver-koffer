@@ -344,7 +344,7 @@ Erstellt am 2026-06-24. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 4 MEDIUM + 3 LOW gefunden und behoben — Ownership-Check für Status-Skript (Privilege Escalation), `dirname` → `SCRIPT_DIR`-Muster in status.sh, Timeout-Loop ohne Fehlercode → Exit 1 nach Polling, totes `WAS_ACTIVE`-Flag + unbedingter Start in restart.sh → Guard, `$(seq)` → `{1..10}`, `grep`-basierter Unit-Check → `systemctl cat`, stop.sh zeigt jetzt Status auch wenn bereits inaktiv.
 
-#### Schritt 12 – Desktop-Shortcuts (Commit: ausstehend)
+#### Schritt 12 – Desktop-Shortcuts (Commit: 7add867)
 
 Erstellt am 2026-06-24. Enthält:
 

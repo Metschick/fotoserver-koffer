@@ -358,11 +358,30 @@ Erstellt am 2026-06-24. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 2 HIGH + 4 MEDIUM gefunden und behoben — fehlende Skript-Ownership-Sicherung in setup-desktop.sh (HIGH), `..`-Traversal in INSTALL_DIR-Regex via `realpath -m` + Abweichungs-Check (HIGH), fehlende Gruppe in `chown` für Desktop-Dateien (MEDIUM), `USER_HOME`-Validierung (MEDIUM), TMP_FILES-Array für vollständige trap-Abdeckung (MEDIUM), restart.sh startet jetzt auch wenn Fotoserver nicht aktiv war (MEDIUM-Usability); LOW: `read -r dummy`, explizites `NOT_HANDLED`.
 
-**Offener Punkt für andere Setup-Skripte:** `setup-nginx.sh` und `setup-systemd.sh` verwenden dieselbe `INSTALL_DIR`-Regex ohne `realpath`-Normalisierung. Fix ist in Schritt 13 (install.sh) vorgesehen.
+**Offener Punkt für andere Setup-Skripte:** `setup-nginx.sh` und `setup-systemd.sh` verwenden dieselbe `INSTALL_DIR`-Regex ohne `realpath`-Normalisierung. Fix wurde in Schritt 13 nachgezogen.
+
+#### Schritt 13 – Install-Skript (Commit: TBD)
+
+Erstellt am 2026-06-24. Enthält:
+
+* `deploy/scripts/install.sh`: Vollständige Erstinstallation — zwei Modi: `--source DIR` (lokaler Code via rsync) und `--version VER` (GitHub Release); `--desktop USER` für optionale Desktop-Shortcuts; `--no-apt` für Systeme mit vorinstallierten Paketen; 10-phasige Ausführung (apt, Verzeichnis, Code, venv, Frontend-dist, .env, Berechtigungen, systemd, nginx, Desktop)
+* `deploy/scripts/update.sh`: Update via `git pull --ff-only` + pip install + setup-systemd + fotoserver-restart; nur für Git-basierte Installationen; prüft Remote-URL vor Pull
+* `deploy/scripts/setup-nginx.sh`: Nachgezogen — `realpath -m`-Normalisierung + Abweichungs-Check + bedingtes `nginx reload` nach Re-Konfiguration
+* `deploy/scripts/setup-systemd.sh`: Nachgezogen — `realpath -m`-Normalisierung + Abweichungs-Check
+
+**Sicherheits-Muster in install.sh:**
+- `FOTOSERVER_GITHUB_REPO`-Validierung: Regex `^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$` verhindert URL-Injection in `GITHUB_BASE`
+- Quellcode-Download (--version): Download erst in Temp-Datei, dann `tar -xf` (kein Pipe-to-tar) — verhindert Partial-Extract bei Netzwerkfehler
+- Einheitlicher akkumulierender Cleanup-Trap (`_CLEANUP_TMPS`-Array, kein `trap - EXIT`-Reset zwischen Phasen) — alle Temp-Dateien werden bei EXIT bereinigt
+- curl: `--proto '=https' --tlsv1.2 --max-redirs 3` bei allen Netzwerk-Downloads
+- `find`-basierte Berechtigungs-Setzung schließt `uploads/` und `data/` explizit aus (`-path ... -prune`) — verhindert world-readable Permissions auf Nutzerdaten bei Re-Runs
+- `SECRET_KEY=CHANGE_ME`-Platzhalter-Check vor `sed`: Warnung wenn Platzhalter fehlt (kein stiller Fehler)
+
+**ECC-Security-Review-Ergebnis:** 3 HIGH + 4 MEDIUM gefunden und behoben — `FOTOSERVER_GITHUB_REPO`-Injection (HIGH), Pipe-to-tar ohne Integrity-Check (HIGH), `trap - EXIT`-Reset lässt Temp-Dirs ungeschützt (HIGH); stille sed-Substitution bei fehlendem Platzhalter (MEDIUM), `find+chmod` auf `uploads/` bei Re-Runs (MEDIUM), `git pull` als root ohne Remote-URL-Validierung in update.sh (MEDIUM), kein `nginx reload` nach setup-nginx.sh bei laufendem Nginx (MEDIUM). LOW-Findings (curl-Protokoll-Flags, realpath-Verhalten): LOW-8 (--proto/--tlsv1.2) ebenfalls behoben.
 
 ### Nächster Schritt
 
-**Schritt 13 – Install-Skript** (`install.sh`)
+**Schritt 14 – Hotspot-Setup** (`hostapd.conf`, `dnsmasq.conf`, Setup-Skript)
 
 ---
 

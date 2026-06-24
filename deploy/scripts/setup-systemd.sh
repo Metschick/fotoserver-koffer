@@ -6,7 +6,9 @@
 #   FOTOSERVER_INSTALL_DIR=/opt/fotoserver  (Standard)
 set -euo pipefail
 
-INSTALL_DIR="${FOTOSERVER_INSTALL_DIR:-/opt/fotoserver}"
+# realpath -m normalisiert den Pfad und entfernt ".." — Schutz vor Path-Traversal.
+_RAW_INSTALL_DIR="${FOTOSERVER_INSTALL_DIR:-/opt/fotoserver}"
+INSTALL_DIR="$(realpath -m "$_RAW_INSTALL_DIR")"
 
 # ── Pfad-Validierung ───────────────────────────────────────────────────────
 # Nur absoluter Pfad mit sicheren Zeichen erlaubt.
@@ -14,6 +16,11 @@ INSTALL_DIR="${FOTOSERVER_INSTALL_DIR:-/opt/fotoserver}"
 if [[ ! "$INSTALL_DIR" =~ ^/[a-zA-Z0-9._/-]+$ ]]; then
     echo "Fehler: FOTOSERVER_INSTALL_DIR enthält ungültige Zeichen: $INSTALL_DIR" >&2
     echo "  Erlaubt: absoluter Pfad, nur [a-zA-Z0-9._/-]" >&2
+    exit 1
+fi
+if [[ "$INSTALL_DIR" != "$_RAW_INSTALL_DIR" ]]; then
+    echo "Fehler: FOTOSERVER_INSTALL_DIR enthält '..' oder ist nicht kanonisch." >&2
+    echo "  Eingabe: $_RAW_INSTALL_DIR → normalisiert: $INSTALL_DIR" >&2
     exit 1
 fi
 

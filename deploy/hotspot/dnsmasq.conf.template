@@ -1,0 +1,23 @@
+# dnsmasq-Konfiguration für Fotoserver-Koffer
+# Generiert von setup-hotspot.sh — NICHT manuell bearbeiten.
+# Lauscht nur auf dem Hotspot-Interface; stellt DHCP und Captive-DNS bereit.
+
+# Nur auf Hotspot-Interface binden (nicht auf eth0 / lo)
+interface=__INTERFACE__
+bind-interfaces
+
+# DHCP-Pool
+dhcp-range=__DHCP_START__,__DHCP_END__,255.255.255.0,12h
+dhcp-option=3,__HOTSPOT_IP__        # Standard-Gateway → Pi
+dhcp-option=6,__HOTSPOT_IP__        # DNS-Server → Pi
+
+# Captive-DNS: alle Domains → Pi-IP (Offline-Betrieb)
+# Clients erreichen den Fotoserver unter beliebiger URL oder 192.168.x.1
+address=/#/__HOTSPOT_IP__
+
+# Kein Upstream-DNS (kein Internet im Hotspot-Netz)
+no-resolv
+no-hosts
+
+# DHCP-Vergaben ins Journal loggen
+log-dhcp

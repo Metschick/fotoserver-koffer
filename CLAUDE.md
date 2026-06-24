@@ -379,9 +379,34 @@ Erstellt am 2026-06-24. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 3 HIGH + 4 MEDIUM gefunden und behoben — `FOTOSERVER_GITHUB_REPO`-Injection (HIGH), Pipe-to-tar ohne Integrity-Check (HIGH), `trap - EXIT`-Reset lässt Temp-Dirs ungeschützt (HIGH); stille sed-Substitution bei fehlendem Platzhalter (MEDIUM), `find+chmod` auf `uploads/` bei Re-Runs (MEDIUM), `git pull` als root ohne Remote-URL-Validierung in update.sh (MEDIUM), kein `nginx reload` nach setup-nginx.sh bei laufendem Nginx (MEDIUM). LOW-Findings (curl-Protokoll-Flags, realpath-Verhalten): LOW-8 (--proto/--tlsv1.2) ebenfalls behoben.
 
+#### Schritt 14 – Hotspot-Setup (Commit: TBD)
+
+Erstellt am 2026-06-24. Enthält:
+
+* `deploy/hotspot/hostapd.conf.template`: WPA2-only (CCMP/AES, kein TKIP); `ap_isolate=1` (Clients können sich nicht gegenseitig sehen); `ieee80211n=1` + `wmm_enabled=1` (802.11n auf Pi 5); Platzhalter `__INTERFACE__`, `__SSID__`, `__PASSWORD__`, `__COUNTRY__`
+* `deploy/hotspot/dnsmasq.conf.template`: DHCP-Pool (`__DHCP_START__`–`__DHCP_END__`); `address=/#/__HOTSPOT_IP__` (Captive-DNS — alle Domains → Pi); `no-resolv` + `no-hosts` (kein Upstream-DNS); `bind-interfaces` (nur auf Hotspot-Interface)
+* `deploy/hotspot/nm-unmanage.conf`: NetworkManager-Config-Snippet — verhindert NM-Übernahme des Hotspot-Interfaces; Platzhalter `__INTERFACE__`
+* `deploy/hotspot/fotoserver-wlan0.service.template`: Oneshot-Service — setzt statische IP (`ip addr replace`) vor hostapd-Start; räumt IP beim Stop (`ip addr flush`) wieder ab; `PartOf=fotoserver.target`, `Before=hostapd.service`
+* `deploy/scripts/setup-hotspot.sh`: Liest HOTSPOT_*-Werte aus .env (nie `source`); Python-Substitution für SSID/Passwort (Passwort via Umgebungsvariable, nicht Argument → nicht in `ps aux`); `install -m 600` für hostapd.conf; `install` statt `mv` für alle Config-Dateien (atomar auch über Filesystem-Grenzen); NM-`reload` statt `restart` (kein Verbindungsabbruch)
+* `deploy/systemd/hostapd.service.d/fotoserver.conf`: Um `Wants=fotoserver-wlan0.service` + `After=fotoserver-wlan0.service` erweitert (Soft-Dep — hostapd startet auch ohne Hotspot-Setup)
+* `.env.example`: `HOTSPOT_COUNTRY=DE` ergänzt; Hinweis zu `#` in Passwörtern
+* `deploy/scripts/install.sh`: `--hotspot`-Flag ergänzt (ruft setup-hotspot.sh als optionale Phase 10 auf); `hostapd dnsmasq iproute2` zu APT-Paketen hinzugefügt; Desktop-Shortcuts zu Phase 11
+
+**Sicherheits-Muster in setup-hotspot.sh:**
+- `_env_get()`: grep + sed, nie `source .env`; verankerte Regex (`^KEY[[:space:]]*=`) verhindert Substring-Match auf ähnliche Keys
+- HOTSPOT_PASSWORD via `FOTOSERVER_HOTSPOT_PW`-Umgebungsvariable an Python (nicht als argv — kein `ps aux`-Leak)
+- IP-Validierung: Format-Regex + Oktet-Bereichsprüfung (0 und 255 als Host-Adressen ausgeschlossen)
+- DHCP-Pool-Kollisions-Check: Pi-IP darf nicht im Pool .10–.100 liegen
+- `install` (statt `mv`) für alle Config-Dateien: atomar auch wenn `/tmp` tmpfs ist
+- NM-`reload` (SIGHUP) statt `restart`: re-reads conf.d ohne bestehende Verbindungen zu unterbrechen
+
+**Captive-DNS-Konzept:** `address=/#/192.168.4.1` leitet alle DNS-Anfragen auf die Pi-IP um. Geräte im Hotspot erreichen den Fotoserver unter beliebiger Domain oder direkt über `192.168.4.1`. `no-resolv` verhindert Upstream-Lookups (kein Internet nötig).
+
+**ECC-Security-Review-Ergebnis:** 0 HIGH + 4 MEDIUM + 3 LOW gefunden und behoben — IP-Oktet-Bereichsprüfung (MEDIUM), DHCP-Pool-Kollision mit Pi-IP (MEDIUM), `mv` von `/tmp` nach `/etc` nicht atomar auf Pi (MEDIUM, fix: `install`), NM-`restart` unterbricht Verbindungen (MEDIUM, fix: `reload`); `grep -v` Substring → verankerte Regex (LOW), `#` in Passwort truncates silently (LOW, Doku in .env.example).
+
 ### Nächster Schritt
 
-**Schritt 14 – Hotspot-Setup** (`hostapd.conf`, `dnsmasq.conf`, Setup-Skript)
+**Schritt 15 – Logging + Exception-Handler**
 
 ---
 

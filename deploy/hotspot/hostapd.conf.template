@@ -1,0 +1,31 @@
+# hostapd-Konfiguration für Fotoserver-Koffer
+# Generiert von setup-hotspot.sh — NICHT manuell bearbeiten.
+# ACHTUNG: Enthält WPA-Passwort im Klartext.
+# Berechtigungen: chmod 600, chown root:root (wird von setup-hotspot.sh gesetzt)
+
+interface=__INTERFACE__
+driver=nl80211
+ssid=__SSID__
+
+# 2.4-GHz-Modus mit 802.11n (Raspberry Pi 5 / breiteste Gerätekompatibilität)
+hw_mode=g
+channel=6
+country_code=__COUNTRY__
+ieee80211n=1
+wmm_enabled=1
+
+# WPA2 — nur AES-CCMP, kein TKIP
+auth_algs=1
+wpa=2
+wpa_passphrase=__PASSWORD__
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+
+# AP-Isolation: Clients können sich nicht gegenseitig sehen
+ap_isolate=1
+
+# Logging: nur Warnungen ins Journal
+logger_syslog=-1
+logger_syslog_level=2
+logger_stdout=-1
+logger_stdout_level=2

@@ -1,0 +1,18 @@
+[Unit]
+Description=Fotoserver-Koffer: Statische IP für __INTERFACE__
+Documentation=https://github.com/__GITHUB_REPO__
+PartOf=fotoserver.target
+BindsTo=fotoserver.target
+Before=hostapd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Statische IP vor hostapd setzen (hostapd erwartet ein konfiguriertes Interface)
+ExecStart=/usr/sbin/ip link set __INTERFACE__ up
+ExecStart=/usr/sbin/ip addr replace __HOTSPOT_IP__/24 dev __INTERFACE__
+
+# IP beim Stop zurückziehen
+ExecStop=/usr/sbin/ip addr flush dev __INTERFACE__
+ExecStop=/usr/sbin/ip link set __INTERFACE__ down

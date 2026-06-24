@@ -41,12 +41,16 @@ APT_PACKAGES=(
     git
     curl
     rsync
+    hostapd
+    dnsmasq
+    iproute2
 )
 
 # ── Argument-Parsing ───────────────────────────────────────────────────────
 SOURCE_DIR=""
 VERSION=""
 DESKTOP_USER=""
+SETUP_HOTSPOT=false
 NO_APT=false
 
 usage() {
@@ -59,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         --source)   SOURCE_DIR="${2:-}"; shift 2 ;;
         --version)  VERSION="${2:-}";    shift 2 ;;
         --desktop)  DESKTOP_USER="${2:-}"; shift 2 ;;
+        --hotspot)  SETUP_HOTSPOT=true;  shift   ;;
         --no-apt)   NO_APT=true;         shift   ;;
         --help|-h)  usage ;;
         *) echo "Unbekannte Option: $1" >&2; echo "  install.sh --help" >&2; exit 1 ;;
@@ -356,7 +361,17 @@ FOTOSERVER_INSTALL_DIR="$INSTALL_DIR" \
     "$INSTALL_DIR/deploy/scripts/setup-nginx.sh"
 
 # ══════════════════════════════════════════════════════════════════════════
-# Phase 10 – Desktop-Shortcuts (optional)
+# Phase 10 – Hotspot-Setup (optional, --hotspot)
+# ══════════════════════════════════════════════════════════════════════════
+if [[ "$SETUP_HOTSPOT" == true ]]; then
+    phase "Hotspot-Setup"
+    FOTOSERVER_INSTALL_DIR="$INSTALL_DIR" \
+    FOTOSERVER_GITHUB_REPO="$GITHUB_REPO" \
+        "$INSTALL_DIR/deploy/scripts/setup-hotspot.sh"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════
+# Phase 11 – Desktop-Shortcuts (optional)
 # ══════════════════════════════════════════════════════════════════════════
 if [[ -n "$DESKTOP_USER" ]]; then
     phase "Desktop-Shortcuts"

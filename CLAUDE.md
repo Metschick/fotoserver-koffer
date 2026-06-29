@@ -441,9 +441,26 @@ Erstellt am 2026-06-29. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 0 HIGH + 3 MEDIUM + 2 LOW gefunden und behoben — fehlende `/home/`/`/root/`-Sperre für BACKUP_DIR (MEDIUM), `mkdir -p + chmod` Race-Window → `install -d -m 700` (MEDIUM), BACKUP_KEEP-Overflow bei >2^63 → Obergrenze 9999 (MEDIUM); `find|xargs` Newline-Splitting → NUL-getrennte Pipeline (LOW), kein `try/finally` im Python-SQLite-Block (LOW).
 
+#### Schritt 18 – Dokumentation + Tests (Commit: TBD)
+
+Erstellt am 2026-06-29. Enthält:
+
+* `docs/development.md`: Lokale Entwicklungsumgebung — Voraussetzungen, Backend-Setup (venv, uvicorn, pytest, ruff), Frontend-Setup (npm, Vite Dev-Server, Build), vollständige Projektstruktur-Übersicht, häufige Fehler
+* `docs/architecture.md`: Systemübersicht (Blockdiagramm), Tech-Stack-Tabelle, Modul-Beschreibungen für alle `app/`-Komponenten, Sicherheitsentscheidungen-Tabelle, Dateistruktur auf dem Pi, systemd-Dienste-Tabelle, Frontend-Build-Strategie
+* `docs/deployment.md`: Raspberry-Pi-Deployment-Guide — Systempakete, Erstinstallation via `install.sh`, Fotoserver starten/stoppen, `.env`-Konfigurations-Referenz, Backup (manuell + Timer + USB-SSD), Updates via `update.sh`, Logs-Befehle, Troubleshooting (Hotspot, Backend, Nginx, Backup)
+* `backend/tests/test_config.py`: 8 Tests für Sicherheits-Validatoren — `secret_key` (CHANGE_ME abgelehnt, zu kurz abgelehnt, ≥32 Zeichen akzeptiert, länger akzeptiert), `log_level` (alle 5 Werte akzeptiert, Kleinschreibung normalisiert, ungültiger Wert abgelehnt, Leerstring abgelehnt)
+* `backend/requirements-dev.txt`: `pytest-cov>=5.0.0` ergänzt
+* `backend/pyproject.toml`: Coverage-Konfiguration (`--cov=app`, `term-missing`, `htmlcov/`); `[tool.coverage.run]` + `[tool.coverage.report]`
+
+**Teststatus:** 68/68 grün, ruff clean.
+
+**Coverage:** 91% gesamt — fehlende 9%: Video-Thumbnail-ffmpeg-Pfade (bereits via Mocks getestet), DB-Fehler-Pfade in `health.py`/`storage.py`, `check_disk_space`-Fehlerfall.
+
+**Dokumentation:** `docs/development.md` und `docs/architecture.md` waren bereits in `README.md` verlinkt (seit Schritt 1), aber noch nicht erstellt. Alle drei Docs-Dateien füllen den `docs/`-Platzhalter aus.
+
 ### Nächster Schritt
 
-**Schritt 17 – GTK-Tray-App (V2a, optional)**
+**Schritt 17 – GTK-Tray-App (V2a, optional)** oder **V1 abgeschlossen — Deployment auf Pi**
 
 ---
 

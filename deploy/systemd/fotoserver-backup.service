@@ -1,0 +1,36 @@
+# Fotoserver-Koffer – Backup-Service (oneshot, manuell oder via Timer).
+# Ausführen: sudo systemctl start fotoserver-backup.service
+# Logs:      sudo journalctl -u fotoserver-backup.service
+[Unit]
+Description=Fotoserver-Koffer Backup (SQLite + uploads)
+Documentation=https://github.com/Metschick/fotoserver-koffer
+After=local-fs.target
+# Unabhängig von fotoserver.target — Backup funktioniert auch im gestoppten Modus.
+
+[Service]
+Type=oneshot
+ExecStart=/opt/fotoserver/deploy/scripts/fotoserver-backup.sh
+StandardOutput=journal
+StandardError=journal
+
+# Backup-Konfiguration als Umgebungsvariablen (Defaults überschreiben)
+# Environment=FOTOSERVER_BACKUP_DIR=/media/usb-backup
+# Environment=FOTOSERVER_BACKUP_KEEP=14
+
+# Sicherheits-Hardening
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/fotoserver/backups /opt/fotoserver/uploads /opt/fotoserver/data
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+UMask=0077

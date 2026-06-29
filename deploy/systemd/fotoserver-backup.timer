@@ -1,0 +1,18 @@
+# Fotoserver-Koffer – täglicher Backup-Timer (optional).
+# Aktivieren:   sudo systemctl enable --now fotoserver-backup.timer
+# Deaktivieren: sudo systemctl disable --now fotoserver-backup.timer
+# Status:       systemctl list-timers fotoserver-backup.timer
+[Unit]
+Description=Tägliche Fotoserver-Koffer Datensicherung
+Documentation=https://github.com/Metschick/fotoserver-koffer
+
+[Timer]
+# Täglich um 02:00 Uhr Ortszeit
+OnCalendar=*-*-* 02:00:00
+# Verpasste Läufe nach Systemstart nachholen (z. B. nach Powerbank-Abschaltung)
+Persistent=true
+# Zufällige Verzögerung ±30 min — verhindert Last-Spitzen bei vielen Geräten
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target

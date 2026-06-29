@@ -422,9 +422,28 @@ Erstellt am 2026-06-29. Enthält:
 
 **ECC-Review-Ergebnis:** 0 HIGH + 3 MEDIUM gefunden und behoben — `r.message` statt `r.getMessage()` (MEDIUM, Test-Falsch-Positiv für Method/Path-Inhalt), fehlender OpenAPI-Schema-Cache-Reset in `error_route`-Teardown (MEDIUM), `configure_logging()` in Lifespan läuft nach Engine-Import (MEDIUM, architektonische Notiz — kein Korrektheitsproblem im Normalbetrieb, Library-Logger-Drosselung läuft via `setLevel()` unconditionally).
 
+#### Schritt 16 – Backup-Skript (Commit: TBD)
+
+Erstellt am 2026-06-29. Enthält:
+
+* `deploy/scripts/fotoserver-backup.sh`: Root-Check; INSTALL_DIR + BACKUP_DIR-Validierung (`realpath -m`, Regex, kein `/home/`/`/root/`); BACKUP_KEEP-Validierung (Regex + Obergrenze 9999); SQLite-Backup via `sqlite3.Connection.backup()` (WAL-sicherer Online Backup API, `mode=ro`, `try/finally`); `cp -a` für uploads/ (kopiert Symlinks als Nodes, kein Dereferenzieren); `install -d -m 700` (atomar, kein Race-Window zwischen mkdir + chmod); tar.gz-Archiv in Temp-Datei im BACKUP_DIR (atomar über fs-Grenzen); Retention-Logik via `find -print0 | sort -rz | tail -zn | xargs -0` (NUL-getrennt, sicher bei Dateinamen mit Spaces); akkumulierender Cleanup-Trap
+* `deploy/systemd/fotoserver-backup.service`: Oneshot-Service — direkter manueller Start via `systemctl start`; Hardening: `PrivateTmp=yes`, `ProtectSystem=strict`, `ReadWritePaths=/opt/fotoserver/backups /opt/fotoserver/uploads /opt/fotoserver/data`, `CapabilityBoundingSet=`, `NoNewPrivileges=yes`, `UMask=0077`; kommentierte `Environment=`-Zeilen für USB-SSD-Konfiguration
+* `deploy/systemd/fotoserver-backup.timer`: Täglicher Timer um 02:00 Uhr; `Persistent=true` (verpasste Läufe nach Powerbank-Abschaltung nachholen); `RandomizedDelaySec=1800` (±30 min Streuung); optional via `systemctl enable --now fotoserver-backup.timer`
+* `.env.example`: `FOTOSERVER_BACKUP_DIR` + `FOTOSERVER_BACKUP_KEEP` ergänzt
+
+**Backup-Konzept V1:**
+- Backup-Ziel: konfigurierbar via `FOTOSERVER_BACKUP_DIR` (Standard: `<INSTALL_DIR>/backups`)
+- USB-SSD: `FOTOSERVER_BACKUP_DIR=/media/usb-backup` im systemd-Service als `Environment=` setzen
+- Dateinamenformat: `fotoserver-backup-YYYY-MM-DDTHH-MM-SSZ.tar.gz`
+- Archivinhalt: `fotoserver.db` (SQLite-Snapshot) + `uploads/` (alle Originaldateien + Thumbnails)
+- Automatisierung: optional via `systemctl enable --now fotoserver-backup.timer`
+- Manuell: `sudo fotoserver-backup.sh` oder `sudo systemctl start fotoserver-backup.service`
+
+**ECC-Security-Review-Ergebnis:** 0 HIGH + 3 MEDIUM + 2 LOW gefunden und behoben — fehlende `/home/`/`/root/`-Sperre für BACKUP_DIR (MEDIUM), `mkdir -p + chmod` Race-Window → `install -d -m 700` (MEDIUM), BACKUP_KEEP-Overflow bei >2^63 → Obergrenze 9999 (MEDIUM); `find|xargs` Newline-Splitting → NUL-getrennte Pipeline (LOW), kein `try/finally` im Python-SQLite-Block (LOW).
+
 ### Nächster Schritt
 
-**Schritt 16 – Backup-Skript**
+**Schritt 17 – GTK-Tray-App (V2a, optional)**
 
 ---
 

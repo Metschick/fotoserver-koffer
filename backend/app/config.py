@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -39,6 +40,22 @@ class Settings(BaseSettings):
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
+    log_level: str = "INFO"
+
+    _valid_log_levels: ClassVar[frozenset[str]] = frozenset(
+        {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    )
+
+    @field_validator("log_level")
+    @classmethod
+    def log_level_must_be_valid(cls, v: str) -> str:
+        upper = v.upper()
+        if upper not in cls._valid_log_levels:
+            raise ValueError(
+                f"log_level muss eines von {sorted(cls._valid_log_levels)} sein, "
+                f"erhalten: {v!r}"
+            )
+        return upper
 
     @property
     def allowed_mime_types(self) -> set[str]:

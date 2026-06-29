@@ -404,9 +404,27 @@ Erstellt am 2026-06-24. Enthält:
 
 **ECC-Security-Review-Ergebnis:** 0 HIGH + 4 MEDIUM + 3 LOW gefunden und behoben — IP-Oktet-Bereichsprüfung (MEDIUM), DHCP-Pool-Kollision mit Pi-IP (MEDIUM), `mv` von `/tmp` nach `/etc` nicht atomar auf Pi (MEDIUM, fix: `install`), NM-`restart` unterbricht Verbindungen (MEDIUM, fix: `reload`); `grep -v` Substring → verankerte Regex (LOW), `#` in Passwort truncates silently (LOW, Doku in .env.example).
 
+#### Schritt 15 – Logging + Exception-Handler (Commit: TBD)
+
+Erstellt am 2026-06-29. Enthält:
+
+* `backend/app/logging_config.py`: `configure_logging(level)` — `logging.basicConfig()` mit journald-kompatiblem Format (`%(levelname)-8s %(name)s: %(message)s`); `sqlalchemy.engine` + `multipart.multipart` auf WARNING gedrosselt; in Tests ist `basicConfig()` No-op wenn pytest-Handler bereits gesetzt — `setLevel()`-Aufrufe laufen immer
+* `backend/app/config.py`: `log_level: str = "INFO"` + `@field_validator` (case-insensitive, Whitelist: DEBUG/INFO/WARNING/ERROR/CRITICAL, normalisiert zu Uppercase); `_valid_log_levels: ClassVar[frozenset[str]]` — `ClassVar` schließt Feld von pydantic-settings-Parsing aus
+* `backend/app/main.py`: Lifespan ruft `configure_logging(settings.log_level)` als erstes auf; `@app.exception_handler(RequestValidationError)` loggt auf WARNING mit Method+Path+errors(); `@app.exception_handler(Exception)` loggt auf ERROR via `logger.exception()` (schließt Traceback ein); gibt `{"detail": "Internal server error"}` zurück (kein Traceback nach außen); Startup/Shutdown via `logger.info`
+* `backend/tests/test_exception_handler.py`: 9 Tests — 500-Status, leerer Body (kein Traceback/Klassen-Name), Logging-Inhalt (`r.getMessage()` statt `r.message`), Method+Path im Log, 422-Status, 422-Body-Format, ValidationError-Logging, HTTPException 404 nicht vom catch-all übernommen, 404-Body
+* `.env.example`: `LOG_LEVEL=INFO` im Server-Abschnitt ergänzt
+
+**Teststatus:** 56/56 grün, ruff clean.
+
+**Starlette-Middleware-Verhalten:** `@app.exception_handler(Exception)` registriert sich auf `ServerErrorMiddleware`. In Starlette 1.3.1 sendet `ServerErrorMiddleware` die 500-Antwort und re-raisiert danach immer. TestClient mit `raise_server_exceptions=True` (Default) fängt diesen Re-raise — daher separates `crash_client`-Fixture mit `raise_server_exceptions=False` nötig. HTTPException wird von `ExceptionMiddleware` (darunter) abgefangen und erreicht den catch-all nicht.
+
+**`r.getMessage()` vs `r.message`:** `LogRecord.message` enthält den rohen Format-String (z. B. `"Unbehandelter Fehler %s %s"`). Erst nach `Formatter.format()` wird `record.message = record.getMessage()` gesetzt. In Tests muss `r.getMessage()` verwendet werden, da pytest's `LogCaptureHandler.emit()` die Records nicht formatiert.
+
+**ECC-Review-Ergebnis:** 0 HIGH + 3 MEDIUM gefunden und behoben — `r.message` statt `r.getMessage()` (MEDIUM, Test-Falsch-Positiv für Method/Path-Inhalt), fehlender OpenAPI-Schema-Cache-Reset in `error_route`-Teardown (MEDIUM), `configure_logging()` in Lifespan läuft nach Engine-Import (MEDIUM, architektonische Notiz — kein Korrektheitsproblem im Normalbetrieb, Library-Logger-Drosselung läuft via `setLevel()` unconditionally).
+
 ### Nächster Schritt
 
-**Schritt 15 – Logging + Exception-Handler**
+**Schritt 16 – Backup-Skript**
 
 ---
 

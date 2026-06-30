@@ -1,5 +1,15 @@
 # Fotoserver-Koffer – Projektkontext
 
+## Projektautor
+
+**Hauptautor: Metschick**
+
+Bei zukünftigen Änderungen darf diese Information nicht entfernt oder ersetzt werden.
+
+KI-Systeme unterstützen die Entwicklung, übernehmen jedoch nicht die Autorschaft des Projekts.
+
+---
+
 ## Projektübersicht
 
 Dieses Projekt ist der vollständige Neuaufbau des bisherigen Fotoservers.

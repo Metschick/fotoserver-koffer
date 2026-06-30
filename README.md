@@ -69,6 +69,16 @@ Detaillierter Planungsdokument: [plans/architektur-fotoserver-koffer.md](plans/a
 
 ---
 
+## Autor
+
+Hauptautor: **Metschick**
+
+Dieses Projekt wurde von Metschick entwickelt.
+
+KI-Systeme dienten ausschließlich als Entwicklungsunterstützung und übernehmen keine Autorschaft.
+
+---
+
 ## Lizenz
 
-MIT – siehe [LICENSE](LICENSE)
+GPL-3.0 – siehe [LICENSE](LICENSE)

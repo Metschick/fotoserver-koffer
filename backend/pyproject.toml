@@ -3,7 +3,7 @@ name = "fotoserver-koffer"
 version = "0.1.0"
 description = "Modularer Fotoserver für den Raspberry Pi Hacking-Koffer"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "GPL-3.0-only" }
 authors = [{ name = "Metschick" }]
 
 [tool.ruff]

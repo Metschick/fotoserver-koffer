@@ -6,16 +6,20 @@ Fotos und Videos werden drahtlos hochgeladen und im Browser angezeigt – ohne I
 
 ---
 
-## Features
+## Features (V1)
 
 - Drag & Drop Upload von Bildern und Videos
 - Galerie-Ansicht im Browser
 - Automatische Thumbnail-Generierung
 - Lokaler WLAN-Hotspot (kein Internet nötig)
-- Passwortgeschützter Zugang
-- Admin-Interface zum Verwalten von Medien
-- Terminalfrei bedienbar (V1.5+)
+- Zugangsschutz über lokales WLAN-Hotspot-Passwort
 - Kein Autostart – Fotoserver-Modus bewusst ein- und ausschaltbar
+
+## Geplant (V2)
+
+- Terminalfreie Steuerung via Desktop-Shortcuts und System-Tray (V1.5 / V2a)
+- Admin-Interface zum Verwalten von Medien (Löschen, Serververwaltung)
+- Video-Inline-Wiedergabe im Browser
 
 ---
 

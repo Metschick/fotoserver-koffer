@@ -104,6 +104,10 @@ Dazu gehören insbesondere:
 
 Dieses Repository dient als zentrale Quelle des Projekts.
 
+**Repository:** https://github.com/Metschick/fotoserver-koffer
+
+**Branch-Strategie:** `main` ist die stabile Release-Version. Neue Features werden in separaten Branches entwickelt und erst nach Test und Review nach `main` gemergt.
+
 Nicht in Git speichern:
 
 * Zugangsdaten
@@ -171,7 +175,7 @@ Ziel ist ein sauber aufgebautes, langfristig wartbares Projekt mit vollständige
 
 ---
 
-## Aktueller Projektstand (2026-06-22)
+## Aktueller Projektstand (2026-07-01)
 
 ### Abgeschlossene Schritte
 
@@ -468,9 +472,25 @@ Erstellt am 2026-06-29. Enthält:
 
 **Dokumentation:** `docs/development.md` und `docs/architecture.md` waren bereits in `README.md` verlinkt (seit Schritt 1), aber noch nicht erstellt. Alle drei Docs-Dateien füllen den `docs/`-Platzhalter aus.
 
-### Nächster Schritt
+### V1 – Abgeschlossen und auf GitHub veröffentlicht (2026-07-01)
 
-**Schritt 17 – GTK-Tray-App (V2a, optional)** oder **V1 abgeschlossen — Deployment auf Pi**
+**Status:** Version 1.0 ist vollständig abgeschlossen und auf GitHub veröffentlicht.
+
+**Repository:** https://github.com/Metschick/fotoserver-koffer
+
+**Lizenz:** GNU General Public License v3.0 (GPL-3.0)
+
+**Branch-Strategie ab V2:**
+- `main` bleibt die stabile Release-Version — direkte Commits nur für Hotfixes
+- Neue Features und Weiterentwicklungen erfolgen in separaten Branches
+- Merges nach `main` nur nach Review und Test
+
+**Offene optionale Punkte für V2:**
+- Schritt 17: GTK-Tray-App (V2a) — terminalfreie Steuerung via System-Tray
+- Video-Inline-Wiedergabe: separater `/api/media/{id}/view`-Endpunkt ohne `Content-Disposition: attachment`
+- Admin-Interface: `POST /api/admin/server/stop`, Lösch-Funktion mit Admin-Auth
+- Backup-Ziel: USB-SSD vs. Netzwerk-Backup (noch offen, V2-Entscheidung)
+- Maximale Upload-Größe für Videos: aktuell 100 MB, eventuell auf 500 MB erhöhen
 
 ---
 

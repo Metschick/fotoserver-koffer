@@ -490,7 +490,26 @@ Erstellt am 2026-06-29. Enthält:
 - Video-Inline-Wiedergabe: separater `/api/media/{id}/view`-Endpunkt ohne `Content-Disposition: attachment`
 - Admin-Interface: `POST /api/admin/server/stop`, Lösch-Funktion mit Admin-Auth
 - Backup-Ziel: USB-SSD vs. Netzwerk-Backup (noch offen, V2-Entscheidung)
-- Maximale Upload-Größe für Videos: aktuell 100 MB, eventuell auf 500 MB erhöhen
+
+---
+
+### Post-V1: Streaming-Upload + 10-GB-Limit (2026-07-08)
+
+**Anlass:** Das bisherige 100-MB-Limit war für längere Videos zu knapp. Vor einer Erhöhung wurde der komplette Upload-Pfad (Frontend → nginx → FastAPI → Speicherung) auf RAM-Sicherheit geprüft.
+
+**Befund:** `upload.py` las die gesamte Datei per `await file.read(max_bytes + 1)` als ein einziges `bytes`-Objekt ein, bevor `StorageService.save()` sie am Stück auf die Platte schrieb. Bei einem 10-GB-Limit hätte das den Arbeitsspeicher eines Raspberry Pi vollständig gefüllt (OOM). Nginx' Timeouts (180 s) und Upload-Limit (110 MB) waren ebenfalls nicht für GB-große Dateien ausgelegt.
+
+**Umbau:**
+- `StorageService.save_stream()` (neu, ersetzt `save()`) liest die Datei in 4-MiB-Chunks und schreibt jeden Chunk sofort auf die Platte — nie mehr als ein Chunk gleichzeitig im RAM. MIME-Erkennung läuft auf dem ersten Chunk (4096 B), bevor überhaupt ein Verzeichnis angelegt wird.
+- Temp-Datei liegt während des Schreibens in `uploads/.upload-tmp/` statt im Geräte/Datum-Ordner — verhindert leere Orphan-Verzeichnisse bei Ablehnung (zu groß / Platte voll) während des Streamings.
+- Plattenplatz wird während des Streamings nach jedem Chunk erneut geprüft (nicht nur einmal vorab) — verhindert, dass ein einzelner GB-Upload die Platte vollständig füllt.
+- Neue Exceptions `UnsupportedMediaTypeError`/`FileTooLargeError` (`app/exceptions.py`) statt Vorab-Checks im Router.
+- `deploy/nginx/fotoserver.conf`: `client_max_body_size` auf `11264M`, Timeouts auf `3600s`, `proxy_request_buffering off` (Body direkt an FastAPI durchreichen statt vollständig zwischenzupuffern).
+- `MAX_FILE_SIZE_MB` Default 100 → 10240 (10 GiB) in `.env.example` und `backend/app/config.py`.
+
+**Wo das Limit geändert wird:** `.env` (`MAX_FILE_SIZE_MB`, maßgeblich) **und** `deploy/nginx/fotoserver.conf` (`client_max_body_size`, muss ≥ Backend-Limit sein). Details: [docs/architecture.md](docs/architecture.md#upload-limit-ändern).
+
+**Verifiziert:** Realer End-to-End-Test (uvicorn + curl, kein TestClient) mit einer 2-GB-Datei auf echtem Dateisystem — Server-RSS stieg dabei nur um ~10 MB (nicht um 2 GB), gespeicherte Datei war byte-identisch zum Original. Bestehende 68 Tests weiterhin grün, 2 neue Regressionstests (Multi-Chunk-Datei, kein Orphan-Verzeichnis bei Ablehnung) ergänzt — 70/70 grün, ruff clean.
 
 ---
 
@@ -595,4 +614,3 @@ Diese Punkte wurden im Architekturplan bewusst zurückgestellt und müssen vor d
 
 * **Backup-Ziel:** Lokales Backup auf externer USB-SSD, oder Backup über Netzwerk auf einen anderen Rechner?
 * **Mehrsprachigkeit:** Deutsch/Englisch-Umschaltung im Interface?
-* **Maximale Upload-Größe für Videos:** 100 MB aktuell — realistisch für längere Videos? Eventuell auf 500 MB erhöhen?

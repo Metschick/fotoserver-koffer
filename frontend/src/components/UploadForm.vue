@@ -13,7 +13,7 @@ interface UploadItem {
 }
 
 const DEVICE_NAME_RE = /^[a-zA-Z0-9_-]{1,50}$/
-const MAX_BYTES = 100 * 1024 * 1024
+const MAX_BYTES = 10240 * 1024 * 1024
 const ALLOWED_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -23,6 +23,24 @@ const ALLOWED_TYPES = new Set([
   'video/quicktime',
 ])
 const DEVICE_NAME_KEY = 'fotoserver-device-name'
+
+// crypto.randomUUID() erfordert einen Secure Context (HTTPS/localhost) und ist
+// auf dem Hotspot (reines HTTP auf 192.168.4.1) nicht verfügbar — die Exception
+// verhinderte bisher lautlos jedes Hinzufügen einer Datei zur Upload-Liste.
+// crypto.getRandomValues() ist dagegen in jedem Context verfügbar.
+function generateItemId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`
+}
 
 const deviceName = ref(localStorage.getItem(DEVICE_NAME_KEY) ?? '')
 const items = ref<UploadItem[]>([])
@@ -61,11 +79,11 @@ function addFiles(newFiles: File[]) {
       continue
     }
     if (f.size > MAX_BYTES) {
-      rejectedMessages.value.push(`„${f.name}": Datei zu groß (max. 100 MB)`)
+      rejectedMessages.value.push(`„${f.name}": Datei zu groß (max. 10 GB)`)
       continue
     }
     items.value.push({
-      id: crypto.randomUUID(),
+      id: generateItemId(),
       file: f,
       preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
       status: 'pending',
@@ -155,7 +173,8 @@ async function startUpload() {
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 </script>
 
@@ -238,7 +257,7 @@ function formatBytes(bytes: number): string {
         <span class="text-blue-600 dark:text-blue-400">auswählen</span>
       </p>
       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        JPEG, PNG, GIF, WebP, MP4, MOV &middot; max. 100 MB pro Datei
+        JPEG, PNG, GIF, WebP, MP4, MOV &middot; max. 10 GB pro Datei
       </p>
     </div>
 

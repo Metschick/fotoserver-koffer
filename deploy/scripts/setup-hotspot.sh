@@ -176,6 +176,13 @@ install -d -m 755 /etc/hostapd
 install -m 600 -o root -g root "$TMP_HOSTAPD" /etc/hostapd/fotoserver.conf
 echo "  /etc/hostapd/fotoserver.conf (chmod 600, root:root)"
 
+# Debian/Kali maskiert hostapd.service standardmäßig beim apt-Paketinstall
+# (Symlink auf /dev/null), solange keine Config vorliegt. Ohne unmask kann der
+# Service nie starten, selbst mit korrekter Config. "systemctl unmask" ist auf
+# einer bereits unmaskierten Unit ein sicherer No-op (idempotent bei Re-Runs).
+echo "→ Entferne hostapd-Maskierung (Debian-Paket-Default) ..."
+systemctl unmask hostapd
+
 # ── 2. /etc/default/hostapd konfigurieren ─────────────────────────────────
 echo "→ Konfiguriere /etc/default/hostapd ..."
 HOSTAPD_DEFAULT="/etc/default/hostapd"
@@ -194,6 +201,26 @@ echo 'DAEMON_CONF=/etc/hostapd/fotoserver.conf' >> "$TMP_HDEF"
 # install ist atomarer als mv bei /tmp (tmpfs) → /etc (ext4)-Übergängen auf dem Pi
 install -m 644 -o root -g root "$TMP_HDEF" "$HOSTAPD_DEFAULT"
 echo "  /etc/default/hostapd (DAEMON_CONF gesetzt)"
+
+# Das Debian-hostapd-Paket bringt /etc/hostapd/hostapd.conf NICHT mit, aber die
+# systemd-Unit hat "ConditionFileNotEmpty=/etc/hostapd/hostapd.conf" fest verdrahtet
+# im [Unit]-Abschnitt — unabhängig von $DAEMON_CONF oben. Ohne diese (beliebig
+# befüllte) Datei überspringt systemd den Start komplett, mit "inactive" statt
+# "failed" (kein lauter Fehler, daher leicht zu übersehen). Der tatsächlich
+# gelesene Inhalt kommt über DAEMON_CONF aus fotoserver.conf — diese Datei hier
+# bleibt bewusst ein Platzhalter ohne Secrets.
+if [[ ! -s /etc/hostapd/hostapd.conf ]]; then
+    echo "→ Lege /etc/hostapd/hostapd.conf als Platzhalter an (nur für systemd-Condition) ..."
+    TMP_HPLACEHOLDER="$(mktemp /tmp/fotoserver-hplaceholder-XXXXXX.conf)"
+    TMP_FILES+=("$TMP_HPLACEHOLDER")
+    cat > "$TMP_HPLACEHOLDER" <<'EOF'
+# Nicht verwendet. Die tatsächliche hostapd-Konfiguration steht in
+# /etc/hostapd/fotoserver.conf (via DAEMON_CONF in /etc/default/hostapd).
+# Diese Datei existiert nur, damit systemds ConditionFileNotEmpty erfüllt ist.
+EOF
+    install -m 644 -o root -g root "$TMP_HPLACEHOLDER" /etc/hostapd/hostapd.conf
+    echo "  /etc/hostapd/hostapd.conf (Platzhalter, chmod 644, root:root)"
+fi
 
 # ── 3. dnsmasq.conf generieren ─────────────────────────────────────────────
 echo "→ Generiere dnsmasq-Konfiguration ..."

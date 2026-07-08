@@ -79,7 +79,15 @@ Nach dem Start erreichbar unter: **`http://192.168.4.1`**
 
 ## Konfiguration (`.env`)
 
-Die `.env`-Datei muss `chmod 600 root:root` gesetzt sein. systemd liest sie als root und übergibt die Werte als Umgebungsvariablen — der `fotoserver`-Prozess greift nie direkt auf die Datei zu.
+Die `.env`-Datei muss `chmod 600 root:root` gesetzt sein. systemd liest sie als root und übergibt die Werte als Umgebungsvariablen — der `fotoserver`-Prozess greift nie direkt auf die Datei zu. `install.sh` setzt diese Berechtigung bei jedem Lauf erneut (auch wenn `.env` schon existierte) — siehe auch „Datei-Ownership" unten.
+
+Eine `.env`-Datei versorgt sowohl die `Settings`-Klasse des Backends als auch die
+Shell-Skripte (`setup-hotspot.sh`, `fotoserver-backup.sh`) mit Werten — `HOTSPOT_*`,
+`FOTOSERVER_BACKUP_*` und `FOTOSERVER_MODE` werden ausschließlich von den Skripten
+gelesen. `Settings` ist deshalb mit `extra="ignore"` konfiguriert und überspringt
+diese ihr unbekannten Schlüssel, statt beim Start abzubrechen (ohne dieses Flag
+würde pydantic-settings mit `extra_forbidden` fehlschlagen, sobald systemd sie als
+Umgebungsvariablen injiziert).
 
 Wichtige Einstellungen:
 
@@ -90,10 +98,14 @@ Wichtige Einstellungen:
 | `HOTSPOT_PASSWORD` | WPA2-Passwort (8–63 Zeichen) | `MeinSicheresPasswort` |
 | `HOTSPOT_COUNTRY` | ISO 3166-1 alpha-2 | `DE` |
 | `HOTSPOT_IP` | Statische IP des Pi im Hotspot | `192.168.4.1` |
-| `MAX_FILE_SIZE_MB` | Upload-Limit pro Datei | `100` |
+| `MAX_FILE_SIZE_MB` | Upload-Limit pro Datei (Streaming-Upload, RAM-Verbrauch unabhängig von der Dateigröße) | `10240` (10 GB) |
 | `LOG_LEVEL` | Log-Level (`DEBUG`/`INFO`/`WARNING`/`ERROR`) | `INFO` |
 | `FOTOSERVER_BACKUP_DIR` | Backup-Zielverzeichnis | `/media/usb-backup` |
 | `FOTOSERVER_BACKUP_KEEP` | Anzahl behaltener Backups | `7` |
+
+**Upload-Limit ändern:** `MAX_FILE_SIZE_MB` allein genügt nicht — `client_max_body_size` in `deploy/nginx/fotoserver.conf` muss konsistent mitgezogen werden (Nginx weist sonst große Uploads bereits vor dem Backend ab). Details und alle betroffenen Stellen: [docs/architecture.md](architecture.md#upload-limit-ändern).
+
+Uploads im GB-Bereich über den WLAN-Hotspot können je nach Signalqualität mehrere Minuten dauern. `deploy/nginx/fotoserver.conf` setzt dafür `proxy_send_timeout`/`proxy_read_timeout`/`client_body_timeout` auf 3600 s und `proxy_request_buffering off`, damit Nginx den Request-Body direkt an FastAPI durchreicht statt ihn vollständig zwischenzupuffern.
 
 ---
 
@@ -170,6 +182,21 @@ sudo journalctl -u hostapd --since '-5m'
 sudo systemctl reload NetworkManager
 sudo systemctl start fotoserver.target
 ```
+(`fotoserver-start.sh` gibt `wlan0` seit dem Regressionsfix bereits selbst automatisch frei — dieser Schritt ist nur bei direktem `systemctl start fotoserver.target` ohne das Wrapper-Skript nötig.)
+
+Zeigt `journalctl` `hostapd.service ... skipped, unmet condition check
+ConditionFileNotEmpty=/etc/hostapd/hostapd.conf` (Status bleibt `inactive`, kein
+`failed` — daher leicht zu übersehen): Das Debian-`hostapd`-Paket bringt weder eine
+befüllte `/etc/hostapd/hostapd.conf` mit noch ist der Dienst standardmäßig
+demaskiert. `setup-hotspot.sh` behebt beides automatisch (`systemctl unmask
+hostapd` + Platzhalterdatei, damit die systemd-Condition erfüllt ist — die
+tatsächlich genutzte Konfiguration bleibt `/etc/hostapd/fotoserver.conf` via
+`DAEMON_CONF`). Tritt der Fehler dennoch auf, `setup-hotspot.sh` erneut laufen
+lassen (idempotent):
+```bash
+sudo ./deploy/scripts/setup-hotspot.sh
+sudo ./deploy/scripts/fotoserver-start.sh
+```
 
 **Backend antwortet nicht:**
 ```bash
@@ -198,7 +225,9 @@ sudo journalctl -u fotoserver-backup.service -n 50
 
 ## NetworkManager-Konflikt
 
-Falls NetworkManager `wlan0` nach einem System-Update wieder übernimmt:
+`fotoserver-start.sh` stellt `/etc/NetworkManager/conf.d/99-fotoserver.conf` bei jedem Start automatisch wieder her, falls sie fehlt oder ein anderes Interface referenziert — ein manueller Eingriff ist im Normalfall nicht nötig.
+
+Sollte NetworkManager `wlan0` dennoch während eines laufenden Fotoserver-Betriebs übernehmen (z. B. weil ein System-Update NetworkManager neu gestartet hat):
 
 ```bash
 sudo systemctl reload NetworkManager
@@ -206,4 +235,35 @@ sudo systemctl restart fotoserver-wlan0.service
 sudo systemctl restart hostapd
 ```
 
-`setup-hotspot.sh` legt `/etc/NetworkManager/conf.d/fotoserver-wlan0.conf` an, das `wlan0` als `unmanaged` markiert. Diese Datei bleibt bei NM-Updates erhalten.
+---
+
+## Wechsel zwischen Hotspot- und Normalbetrieb
+
+Der Wechsel läuft seit dem Regressionsfix vollautomatisch in `fotoserver-start.sh` bzw. `fotoserver-stop.sh` — für den normalen Betrieb (Desktop-Icons „Start"/„Stop" oder die gleichnamigen Skripte) ist **kein manueller Befehl** mehr nötig:
+
+- **`fotoserver-start.sh`** gibt den in `.env` konfigurierten `HOTSPOT_INTERFACE` (Standard: `wlan0`) automatisch für den Hotspot frei, bevor die Dienste starten — legt `/etc/NetworkManager/conf.d/99-fotoserver.conf` idempotent an und lädt NetworkManager neu. Fehlt oder passt die Datei bereits, wird nichts unnötig neu geladen.
+- **`fotoserver-stop.sh`** gibt das Interface nach dem Stoppen der Dienste automatisch wieder an NetworkManager zurück (entfernt dieselbe Datei + reload). Das läuft auch dann, wenn `fotoserver.target` bereits inaktiv war — der Stop ist vollständig idempotent, ein zweiter Klick auf „Stop" schadet nicht.
+- Danach normal per GUI oder `nmcli device wifi connect "<SSID>" password "<...>"` mit einem WLAN verbinden.
+
+Per Architekturentscheidung läuft der Pi standardmäßig im „Normalbetrieb" ohne Hotspot (siehe CLAUDE.md, Abschnitt „Start/Stop-Konzept") — genau diesen Zustand stellt `fotoserver-stop.sh` jetzt zuverlässig und ohne Zutun wieder her.
+
+**Manueller Eingriff nur nötig, wenn:**
+- `fotoserver.target` außerhalb der Skripte manipuliert wurde (z. B. direktes `systemctl stop fotoserver.target` statt `fotoserver-stop.sh`) — dann bleibt `99-fotoserver.conf` bestehen. Einfach `sudo ./deploy/scripts/fotoserver-stop.sh` nachträglich ausführen (idempotent, holt die NM-Freigabe nach, auch wenn nichts mehr zu stoppen ist).
+- Sich `HOTSPOT_SSID`/`HOTSPOT_PASSWORD`/`HOTSPOT_INTERFACE` etc. in `.env` geändert haben — dafür weiterhin `sudo ./deploy/scripts/setup-hotspot.sh` erneut ausführen (regeneriert `hostapd.conf`/`dnsmasq.conf`; die NM-Freigabe selbst übernimmt beim nächsten Start ohnehin automatisch `fotoserver-start.sh`).
+
+---
+
+## Datei-Ownership: `/opt/fotoserver` als Git-Repo *und* Produktivinstallation
+
+Dieses Projekt geht bewusst davon aus, dass `/opt/fotoserver` gleichzeitig das Git-Arbeitsverzeichnis (Entwicklung, Commits, `git push`) und die laufende Installation ist. `install.sh` chownt deshalb **nicht** rekursiv den gesamten Baum auf `root`, sondern nur gezielt die sicherheitsrelevanten Pfade:
+
+| Pfad | Owner | Grund |
+|---|---|---|
+| `.env` | `root:root`, `600` | Enthält Secrets (`SECRET_KEY`, Passwort-Hashes, WLAN-Passwort) |
+| `deploy/scripts/*.sh` | `root:root`, `755` | Werden per `sudo`/`pkexec` root-privilegiert aufgerufen; `fotoserver-start.sh` & Co. prüfen diese Ownership explizit (Schritt 11/12) — verhindert, dass ein unprivilegierter Nutzer die Steuerskripte austauscht. Zum Bearbeiten: `sudo`. |
+| `uploads/`, `data/` | `fotoserver:fotoserver`, `755` | Laufzeitdaten, die der Service selbst beschreibt (via `setup-systemd.sh`) |
+| Alles andere (Code, `backend/venv`, `deploy/nginx`, `deploy/systemd`, `deploy/hotspot`, `deploy/desktop`, `docs/`, `.git/`) | Betreiber-User (z. B. `kali`) | Git-verwalteter/generierter Baum — wird direkt bearbeitet und gepusht |
+
+Schutz vor einem kompromittierten `fotoserver`-Serviceprozess liefert `ProtectSystem=strict` + `ReadWritePaths=uploads,data` in `fotoserver-api.service` (Schritt 10) — der Service kann unabhängig von Unix-Ownership nirgends außer `uploads/`+`data/` schreiben. Root-Ownership des Codes wäre daher redundante Härtung, die nur die eigene Entwicklung behindert.
+
+**Wichtig:** `sudo chown -R <user>:<user> /opt/fotoserver` (z. B. um sich selbst Schreibzugriff zu verschaffen) setzt auch `.env` und `uploads/`/`data/` auf den eigenen User zurück und hebt damit deren Absicherung auf. Danach `sudo ./deploy/scripts/setup-systemd.sh` (stellt `uploads/`/`data/`-Ownership wieder her) und `sudo chown root:root .env && sudo chmod 600 .env` erneut ausführen.

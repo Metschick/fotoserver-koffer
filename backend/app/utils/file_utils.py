@@ -6,6 +6,17 @@ import magic
 
 DEVICE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,50}$")
 
+# Bytes, die für die MIME-Erkennung (Magic Bytes) gelesen werden, bevor
+# überhaupt etwas auf die Platte geschrieben wird. 4096 B decken die Magic-Byte-
+# Signaturen aller erlaubten Formate ab (JPEG/PNG/GIF/WebP/MP4/MOV liegen alle
+# in den ersten Bytes) und passen bequem in eine einzelne Netzwerk-Page.
+MIME_SNIFF_BYTES = 4096
+
+# Chunk-Größe beim Streamen großer Uploads auf die Platte. 4 MiB hält den RAM-
+# Fußabdruck pro Upload konstant (unabhängig von der Dateigröße) und begrenzt
+# gleichzeitig die Anzahl der Syscalls für Dateien im GB-Bereich.
+UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024
+
 MIME_TO_EXT: dict[str, str] = {
     "image/jpeg": ".jpg",
     "image/png": ".png",

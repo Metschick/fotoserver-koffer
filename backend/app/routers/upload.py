@@ -5,14 +5,11 @@ from sqlmodel import Session
 
 from app.config import Settings, get_settings
 from app.database import get_session
+from app.exceptions import FileTooLargeError, UnsupportedMediaTypeError
 from app.models.media import MediaRead
 from app.services.storage import StorageService
 from app.services.thumbnail import ThumbnailService
-from app.utils.file_utils import (
-    check_disk_space,
-    detect_mime_type,
-    validate_device_name,
-)
+from app.utils.file_utils import check_disk_space, validate_device_name
 
 logger = logging.getLogger(__name__)
 
@@ -31,36 +28,33 @@ async def upload_file(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # Lese maximal max_file_size_bytes + 1 Bytes, um RAM-Flooding zu verhindern
-    max_bytes = settings.max_file_size_bytes
-    data = await file.read(max_bytes + 1)
-    if len(data) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large: max {settings.max_file_size_mb} MB",
-        )
-
-    detected_mime = detect_mime_type(data)
-    if detected_mime not in settings.allowed_mime_types:
-        raise HTTPException(
-            status_code=415,
-            detail=f"Unsupported media type: {detected_mime!r}",
-        )
-
     try:
         check_disk_space(settings.upload_dir, settings.disk_min_free_gb)
     except OSError as exc:
         logger.error("Disk space check failed: %s", exc)
         raise HTTPException(status_code=507, detail=str(exc)) from exc
 
+    # Streaming-Schreibvorgang: die Datei wird in Chunks direkt auf die Platte
+    # geschrieben (nie vollständig als bytes im RAM gehalten), damit auch
+    # Uploads im GB-Bereich auf dem Raspberry Pi verarbeitet werden können.
     storage = StorageService(settings.upload_dir)
-    media = storage.save(
-        file_data=data,
-        original_filename=file.filename or "unknown",
-        device_name=device_name,
-        mime_type=detected_mime,
-        session=session,
-    )
+    try:
+        media = await storage.save_stream(
+            file=file,
+            original_filename=file.filename or "unknown",
+            device_name=device_name,
+            allowed_mime_types=settings.allowed_mime_types,
+            max_bytes=settings.max_file_size_bytes,
+            disk_min_free_gb=settings.disk_min_free_gb,
+            session=session,
+        )
+    except UnsupportedMediaTypeError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+    except FileTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    except OSError as exc:
+        logger.error("Disk space check failed during streaming: %s", exc)
+        raise HTTPException(status_code=507, detail=str(exc)) from exc
     logger.info(
         "Uploaded %s (%d B) from device %r",
         media.stored_as,

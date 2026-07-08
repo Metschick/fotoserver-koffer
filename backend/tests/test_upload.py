@@ -6,6 +6,7 @@ from sqlmodel import Session
 from app.config import Settings, get_settings
 from app.database import get_session
 from app.main import app
+from app.utils.file_utils import UPLOAD_CHUNK_SIZE
 from tests.constants import TEST_SECRET_KEY
 
 # Minimale JPEG-Bytes (ausreichend für python-magic zur Erkennung als image/jpeg)
@@ -194,3 +195,53 @@ def test_upload_disk_full(client, monkeypatch):
         data={"device_name": "test-device"},
     )
     assert resp.status_code == 507
+
+
+# ---------------------------------------------------------------------------
+# Streaming-Upload (10-GB-Limit, Chunk-Verarbeitung)
+# ---------------------------------------------------------------------------
+
+def test_upload_large_file_spans_multiple_chunks(client, upload_dir):
+    """Datei größer als ein einzelner Streaming-Chunk (UPLOAD_CHUNK_SIZE) muss
+    über mehrere Chunks korrekt zusammengesetzt und byte-identisch gespeichert
+    werden."""
+    target_size = UPLOAD_CHUNK_SIZE * 2 + 12345
+    payload = MINIMAL_JPEG + bytes(target_size - len(MINIMAL_JPEG))
+
+    resp = client.post(
+        "/api/upload",
+        files={"file": ("big.jpg", payload, "image/jpeg")},
+        data={"device_name": "stream-test"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["size_bytes"] == target_size
+
+    saved = list(upload_dir.glob("stream-test/**/*.jpg"))
+    assert len(saved) == 1
+    assert saved[0].stat().st_size == target_size
+    assert saved[0].read_bytes() == payload
+
+
+def test_upload_too_large_leaves_no_orphan_directory(session, upload_dir, tmp_path):
+    """Wird eine Datei während des Streamings als zu groß abgelehnt, darf kein
+    leeres Geräte/Datum-Verzeichnis zurückbleiben (gleiche Regel wie bei
+    Thumbnails: kein Orphan-Verzeichnis)."""
+    payload = MINIMAL_JPEG + bytes(2000)
+    c = _make_client(session, upload_dir, tmp_path, max_file_size_mb=0)
+    try:
+        with c:
+            resp = c.post(
+                "/api/upload",
+                files={"file": ("foto.jpg", payload, "image/jpeg")},
+                data={"device_name": "reject-device"},
+            )
+        assert resp.status_code == 413
+    finally:
+        _clear()
+
+    assert not (upload_dir / "reject-device").exists()
+    leftover_tmp = list((upload_dir / ".upload-tmp").glob("*")) if (
+        upload_dir / ".upload-tmp"
+    ).exists() else []
+    assert leftover_tmp == []

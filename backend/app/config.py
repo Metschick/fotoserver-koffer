@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import ClassVar
@@ -8,9 +9,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # In Produktion ist .env bewusst 600 root:root (Secrets); systemd liest sie
+        # als root und übergibt die Werte bereits als Umgebungsvariablen
+        # (EnvironmentFile= in fotoserver-api.service). Der fotoserver-Prozess selbst
+        # darf die Datei nie direkt öffnen können. os.access prüft das zur Laufzeit:
+        # lokal (kali, .env lesbar) wird sie wie gewohnt geparst, in Produktion
+        # (fotoserver, kein Leserecht) übersprungen -- die bereits injizierten
+        # Umgebungsvariablen genügen dann vollständig.
+        env_file=".env" if os.access(".env", os.R_OK) else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # HOTSPOT_*, FOTOSERVER_BACKUP_*, FOTOSERVER_MODE in .env werden nur von den
+        # Shell-Skripten (setup-hotspot.sh, fotoserver-backup.sh) gelesen, nicht von
+        # dieser Settings-Klasse. Ohne "ignore" bricht pydantic-settings mit
+        # extra_forbidden ab, sobald diese Variablen in der Umgebung vorhanden sind.
+        extra="ignore",
     )
 
     # Verzeichnisse
@@ -18,7 +31,11 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
 
     # Upload-Limits
-    max_file_size_mb: int = 100
+    # Standard: 10 GiB (10 * 1024 MB). Änderung an dieser Stelle betrifft nur den
+    # Fallback-Wert -- im laufenden Betrieb überschreibt MAX_FILE_SIZE_MB in .env
+    # diesen Default. Bei einer Änderung muss zusätzlich client_max_body_size in
+    # deploy/nginx/fotoserver.conf konsistent angepasst werden (siehe dort).
+    max_file_size_mb: int = 10240
     disk_min_free_gb: int = 2
     allowed_types: str = (
         "image/jpeg,image/png,image/gif,image/webp,"

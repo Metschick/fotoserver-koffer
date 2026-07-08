@@ -327,21 +327,27 @@ fi
 # ══════════════════════════════════════════════════════════════════════════
 # Phase 7 – Dateisystem-Berechtigungen
 # ══════════════════════════════════════════════════════════════════════════
+# Bewusst KEINE rekursive chown/chmod über $INSTALL_DIR: dieses Projekt lässt
+# /opt/fotoserver zugleich Git-Arbeitsverzeichnis und Produktivinstallation sein
+# (Entwickler committet/pusht direkt hier). Ein rekursives root:root würde den
+# Betreiber aus dem eigenen Repo aussperren. Schutz vor einem kompromittierten
+# fotoserver-Serviceprozess liefert bereits ProtectSystem=strict + ReadWritePaths
+# in fotoserver-api.service (Code ist für den Service ohnehin nie beschreibbar,
+# unabhängig von Unix-Ownership) — daher nur die tatsächlich sicherheitsrelevanten
+# Pfade gezielt härten: die Secrets-Datei und die per sudo/pkexec aufgerufenen
+# Steuerskripte (deren root-Ownership fotoserver-start.sh & Co. explizit prüfen,
+# siehe Schritt 11/12 — sonst könnte ein unprivilegierter Nutzer sie austauschen).
 phase "Dateisystem-Berechtigungen"
 
-echo "→ Setze root:root auf $INSTALL_DIR ..."
-chown -R root:root "$INSTALL_DIR"
-# uploads/ und data/ werden von setup-systemd.sh mit fotoserver-Ownership angelegt;
-# find schließt sie aus damit bereits hochgeladene Dateien nicht überschrieben werden.
-find "$INSTALL_DIR" \
-    -path "$INSTALL_DIR/uploads" -prune -o \
-    -path "$INSTALL_DIR/data" -prune -o \
-    -type d -exec chmod 755 {} +
-find "$INSTALL_DIR" \
-    -path "$INSTALL_DIR/uploads" -prune -o \
-    -path "$INSTALL_DIR/data" -prune -o \
-    -type f -exec chmod 644 {} +
-find "$INSTALL_DIR/deploy/scripts" -name "*.sh" -exec chmod 755 {} +
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+    chown root:root "$INSTALL_DIR/.env"
+    chmod 600 "$INSTALL_DIR/.env"
+    echo "  $INSTALL_DIR/.env (chmod 600, root:root)"
+fi
+# uploads/ und data/ erhalten ihre fotoserver-Ownership durch setup-systemd.sh.
+chown root:root "$INSTALL_DIR/deploy/scripts"
+find "$INSTALL_DIR/deploy/scripts" -name "*.sh" -exec chown root:root {} + -exec chmod 755 {} +
+echo "  $INSTALL_DIR/deploy/scripts (root:root, 755)"
 echo "  Fertig."
 
 # ══════════════════════════════════════════════════════════════════════════

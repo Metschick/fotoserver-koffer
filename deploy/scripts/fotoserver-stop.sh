@@ -24,15 +24,31 @@ if [[ ! -f "$STATUS_SCRIPT" ]]; then
 fi
 
 # Läuft der Fotoserver überhaupt?
-if ! systemctl is-active --quiet fotoserver.target; then
+if systemctl is-active --quiet fotoserver.target; then
+    echo "→ Stoppe Fotoserver-Modus ..."
+    systemctl stop fotoserver.target
+else
     echo "Fotoserver ist nicht aktiv."
-    echo ""
-    "$STATUS_SCRIPT"
-    exit 0
 fi
 
-echo "→ Stoppe Fotoserver-Modus ..."
-systemctl stop fotoserver.target
+# ── wlan0 zurück an NetworkManager geben (voller Rückwechsel in den
+#    Normalbetrieb) ─────────────────────────────────────────────────────────
+# Idempotent: läuft auch wenn fotoserver.target oben bereits inaktiv war
+# (z. B. erneuter Klick auf "Stop"), damit ein Laie sich nie auf den vorherigen
+# internen Zustand verlassen muss. Kein manueller Befehl danach nötig — siehe
+# docs/deployment.md, "Wechsel zwischen Hotspot- und Normalbetrieb".
+NM_CONF="/etc/NetworkManager/conf.d/99-fotoserver.conf"
+if [[ -f "$NM_CONF" ]]; then
+    _iface="$(sed -n 's/.*interface-name:\(.*\)/\1/p' "$NM_CONF" | head -1)"
+    if [[ -z "$_iface" ]]; then
+        _iface="Hotspot-Interface"
+    fi
+    echo "→ Gebe $_iface an NetworkManager zurück (Normalbetrieb) ..."
+    rm -f "$NM_CONF"
+    if systemctl is-active --quiet NetworkManager 2>/dev/null; then
+        systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager
+    fi
+fi
 
 echo ""
 "$STATUS_SCRIPT"

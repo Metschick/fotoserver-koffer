@@ -8,16 +8,18 @@ Fotos und Videos werden drahtlos hochgeladen und im Browser angezeigt – ohne I
 
 ## Features (V1)
 
-- Drag & Drop Upload von Bildern und Videos
+- Drag & Drop Upload von Bildern und Videos (Streaming-Upload, Standard-Limit 10 GB pro Datei)
 - Galerie-Ansicht im Browser
 - Automatische Thumbnail-Generierung
 - Lokaler WLAN-Hotspot (kein Internet nötig)
 - Zugangsschutz über lokales WLAN-Hotspot-Passwort
 - Kein Autostart – Fotoserver-Modus bewusst ein- und ausschaltbar
+- Desktop-Shortcuts für Start/Stopp/Status (PolicyKit, kein Terminal nötig)
+- Automatisches Backup (SQLite + Uploads, manuell oder täglicher Timer)
 
 ## Geplant (V2)
 
-- Terminalfreie Steuerung via Desktop-Shortcuts und System-Tray (V1.5 / V2a)
+- Terminalfreie Steuerung via System-Tray-App (V2a)
 - Admin-Interface zum Verwalten von Medien (Löschen, Serververwaltung)
 - Video-Inline-Wiedergabe im Browser
 
@@ -38,8 +40,10 @@ git clone https://github.com/Metschick/fotoserver-koffer.git /opt/fotoserver
 cd /opt/fotoserver
 cp .env.example .env
 # .env anpassen (Passwörter, SSID etc.)
-sudo ./deploy/scripts/install.sh
+sudo ./deploy/scripts/install.sh --source .
 ```
+
+Vollständige Anleitung mit allen Optionen (Hotspot, Desktop-Shortcuts, Backup, Updates, Troubleshooting): [docs/deployment.md](docs/deployment.md)
 
 ---
 
@@ -55,6 +59,8 @@ sudo ./deploy/scripts/fotoserver-start.sh
 # Fotoserver-Modus stoppen
 sudo ./deploy/scripts/fotoserver-stop.sh
 ```
+
+`fotoserver-start.sh` gibt `wlan0` automatisch für den Hotspot frei und `fotoserver-stop.sh` gibt es beim Stoppen wieder an NetworkManager zurück (Normalbetrieb) — kein manueller Netzwerkbefehl nötig, Details in [docs/deployment.md](docs/deployment.md#wechsel-zwischen-hotspot--und-normalbetrieb).
 
 Nach dem Start erreichbar unter: `http://192.168.4.1`
 

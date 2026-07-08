@@ -41,7 +41,7 @@ Smartphone / Kamera
 ## Backend-Module
 
 ### `app/config.py`
-`Settings`-Klasse (pydantic-settings): liest `.env`, validiert `secret_key` (≥32 Zeichen, kein Default) und `log_level` (Whitelist). Alle Module beziehen Einstellungen über `get_settings()` (gecacht via `@lru_cache`).
+`Settings`-Klasse (pydantic-settings): liest `.env`, validiert `secret_key` (≥32 Zeichen, kein Default) und `log_level` (Whitelist). Alle Module beziehen Einstellungen über `get_settings()` (gecacht via `@lru_cache`). `extra="ignore"`, da dieselbe `.env`-Datei auch `HOTSPOT_*`/`FOTOSERVER_BACKUP_*`-Werte enthält, die ausschließlich von den Shell-Skripten gelesen werden (siehe [docs/deployment.md](deployment.md#konfiguration-env)). `env_file` wird nur gesetzt, wenn `.env` für den aktuellen Prozess lesbar ist — in Produktion (`chmod 600 root:root`) übernimmt systemd die Werte bereits als Umgebungsvariablen (`EnvironmentFile=`), der `fotoserver`-Prozess selbst darf die Datei nie öffnen.
 
 ### `app/database.py`
 SQLite-Engine mit `journal_mode=WAL`, `busy_timeout=5000ms`, `foreign_keys=ON`. `get_session()` als Generator für FastAPI-Dependency-Injection.
@@ -50,13 +50,22 @@ SQLite-Engine mit `journal_mode=WAL`, `busy_timeout=5000ms`, `foreign_keys=ON`. 
 `Media`-SQLModel-Tabelle: UUID-Dateiname, Original-Dateiname (nur als Metadatum, nie als Pfad), MIME-Typ, Gerätename (Whitelist-Regex), Upload-Zeitstempel (UTC), relativer Thumbnail-Pfad. `GalleryPage`-Schema für paginierte Galerie-Antworten.
 
 ### `app/routers/upload.py`
-`POST /api/upload`: Streaming-Read bis `max_bytes + 1` (verhindert Puffern großer Dateien), MIME-Prüfung via Magic Bytes, Disk-Space-Check, Speicherung via `StorageService`.
+`POST /api/upload`: delegiert das eigentliche Schreiben an `StorageService.save_stream()` (Chunk-Streaming, siehe unten), fängt `UnsupportedMediaTypeError` (415), `FileTooLargeError` (413) und `OSError` (507, Plattenplatz) ab und übersetzt sie in HTTP-Statuscodes.
 
 ### `app/routers/gallery.py`
-5 Endpunkte: paginierte Galerie, Album nach Gerät+Datum, Medien-Metadaten, Thumbnail als FileResponse, Original als FileResponse (mit `Content-Disposition: attachment`). Path-Traversal-Schutz via `.resolve() + is_relative_to()`.
+5 Endpunkte: paginierte Galerie, Album nach Gerät+Datum, Medien-Metadaten, Thumbnail als FileResponse, Original als FileResponse (mit `Content-Disposition: attachment`). Path-Traversal-Schutz via `.resolve() + is_relative_to()`. `FileResponse` streamt beide Endpunkte direkt von der Platte (kein Volllesen in den RAM), unabhängig von der Dateigröße.
 
 ### `app/services/storage.py`
-Atomarer Schreibvorgang: `tempfile.mkstemp()` → Daten schreiben → `os.replace()`. DB-Rollback mit Datei-Cleanup bei Commit-Fehler. Ordnerstruktur: `uploads/Gerätename/YYYY-MM-DD/`.
+`StorageService.save_stream()` liest die Upload-Datei in 4-MiB-Chunks (`UPLOAD_CHUNK_SIZE`, siehe `app/utils/file_utils.py`) und schreibt jeden Chunk sofort per `os.write()` auf die Platte — die Datei liegt nie vollständig als `bytes`-Objekt im RAM. MIME-Erkennung (Magic Bytes) läuft auf dem ersten Chunk (`MIME_SNIFF_BYTES = 4096`), bevor überhaupt ein Verzeichnis angelegt wird. Die Temp-Datei liegt während des Schreibens in `uploads/.upload-tmp/` (nicht im Geräte/Datum-Ordner) — wird ein Upload während des Streamings abgelehnt (zu groß, Platte voll), bleibt kein leerer Ordner zurück. Bei Erfolg: atomarer `os.replace()` nach `uploads/Gerätename/YYYY-MM-DD/`. Während des Streamings wird der Plattenplatz nach jedem Chunk erneut geprüft (nicht nur einmal vorab), damit ein einzelner GB-Upload die Platte nicht vollständig füllen kann, bevor das Größenlimit greift.
+
+#### Upload-Limit ändern
+
+Das Limit ist auf 10 GB (10240 MB) pro Datei ausgelegt. Es wird an **zwei** Stellen durchgesetzt und muss bei Änderung an beiden konsistent angepasst werden:
+
+1. **Backend** — `MAX_FILE_SIZE_MB` in `.env` (überschreibt den Fallback `max_file_size_mb` in `backend/app/config.py`). Dies ist die maßgebliche, tatsächlich durchgesetzte Grenze (413 bei Überschreitung, geprüft während des Streamings, nicht erst am Ende).
+2. **Nginx** — `client_max_body_size` in `deploy/nginx/fotoserver.conf` (aktuell `11264M`, ≈ Backend-Limit + 10 % Spielraum für Multipart-Overhead). Ist dieser Wert kleiner als das Backend-Limit, weist Nginx große Uploads bereits ab, bevor sie das Backend erreichen.
+
+Das Frontend (`frontend/src/components/UploadForm.vue`, Konstante `MAX_BYTES`) filtert Dateien nur clientseitig vorab (bessere UX, keine Sicherheitsgrenze) und sollte aus Konsistenzgründen ebenfalls angepasst werden.
 
 ### `app/services/thumbnail.py`
 Synchrone Generierung nach jedem Upload. Bilder: Pillow (EXIF-Transpose, RGB-Konvertierung, max 300×300, LANCZOS). Videos: ffmpeg-Subprocess (erster Frame). Fehler werden abgefangen — `thumb_path` kann `null` sein, Upload bleibt trotzdem 201.
@@ -72,7 +81,7 @@ Synchrone Generierung nach jedem Upload. Bilder: Pillow (EXIF-Transpose, RGB-Kon
 | MIME-Prüfung | Server-seitig via Magic Bytes (python-magic), HTTP-Header ignoriert |
 | Gerätename | Whitelist-Regex `^[a-zA-Z0-9_-]{1,50}$` als Pydantic-Validator im Model |
 | Path-Traversal | Alle DB-abgeleiteten Pfade via `.resolve() + is_relative_to()` validiert |
-| Upload-Limit | 100 MB pro Datei + Disk-Free-Space-Check vor Schreiben |
+| Upload-Limit | 10 GB pro Datei (Streaming-Upload, konstanter RAM-Verbrauch) + fortlaufender Disk-Free-Space-Check |
 | `secret_key` | Pflichtfeld, min. 32 Zeichen, kein Default — Validator wirft bei `CHANGE_ME` |
 | Nginx-Headers | `X-Content-Type-Options`, `X-Frame-Options`, CSP, `Referrer-Policy` |
 | hostapd.conf | `chmod 600 root:root` auf dem Pi; `ap_isolate=1` (Clients isoliert) |
@@ -85,7 +94,8 @@ Synchrone Generierung nach jedem Upload. Bilder: Pillow (EXIF-Transpose, RGB-Kon
 ```
 /opt/fotoserver/
 ├── backend/
-│   └── app/
+│   ├── app/
+│   └── venv/               ← Python-venv (von install.sh angelegt)
 ├── frontend/
 │   └── dist/               ← statische Dateien (Build-Artefakt aus CI)
 ├── deploy/
@@ -102,8 +112,7 @@ Synchrone Generierung nach jedem Upload. Bilder: Pillow (EXIF-Transpose, RGB-Kon
 ├── data/
 │   └── fotoserver.db       ← SQLite-Datenbank (WAL)
 ├── backups/                ← Backup-Archive
-├── .env                    ← Konfiguration (nicht in Git, chmod 600)
-└── .venv/
+└── .env                    ← Konfiguration (nicht in Git, chmod 600)
 ```
 
 ---
